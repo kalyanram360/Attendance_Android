@@ -46,12 +46,13 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
-
+import androidx.navigation.NavController
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(
+    navController: NavController,
 //    viewModel: OnboardingViewModel = viewModel(),
     onOnboardingComplete: () -> Unit = {}
 ) {
