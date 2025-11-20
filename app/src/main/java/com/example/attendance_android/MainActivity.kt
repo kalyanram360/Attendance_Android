@@ -35,16 +35,21 @@ class MainActivity : ComponentActivity() {
 
                     // collect onboarding flag from DataStore
                     val isOnboardingDone by dataStore.isOnboardingComplete.collectAsState(initial = false)
+                    val isStudent by dataStore.isStudent.collectAsState(initial = false)
+                    val role by dataStore.userRole.collectAsState(initial = "")
+
 
                     // coroutine scope for calling suspend functions from UI callbacks
                     val scope = rememberCoroutineScope()
 
                     // Decide start destination based on DataStore flag
-                    val startDestination = if (isOnboardingDone) {
-                        NavRoutes.Home.route
-                    } else {
-                        NavRoutes.Splash.route // keep splash for fresh start -> onboarding
-                    }
+                    val startDestination =
+                        when (role.trim().uppercase()) {
+                            "STUDENT" -> NavRoutes.Home.route
+                            "TEACHER" -> NavRoutes.TeacherHome.route
+                            else -> NavRoutes.Splash.route
+                        }
+
 
                     // Provide Navigation graph and pass a callback to persist onboarding completion
                     Navigation(

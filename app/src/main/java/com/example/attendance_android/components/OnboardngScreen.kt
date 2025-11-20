@@ -157,29 +157,38 @@ fun OnboardingScreen(
             Button(
                 onClick = {
                     if (pagerState.currentPage < pages - 1) {
-                        scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                    } else {
-                        // last page -> call GET /api/check/... and act on result
                         scope.launch {
-                            val exists = try {
-                                checkCollegeNetwork(
-                                    collegeEmail = uiState.email,
-                                    collegeName = uiState.selectedInstitute,
-                                    activationCode = uiState.activationCode
-                                )
+                            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                        }
+                    } else {
+                        // Last page → call correct API based on role
+                        scope.launch {
+                            val success = try {
+                                if (uiState.selectedRole == UserRole.STUDENT) {
+                                    checkStudentAndSave(
+                                        email = uiState.email,
+                                        dataStore = dataStore
+                                    )
+                                } else {
+                                    checkTeacherAndSave(
+                                        email = uiState.email,
+                                        dataStore = dataStore
+                                    )
+                                }
                             } catch (e: Exception) {
                                 e.printStackTrace()
                                 false
                             }
 
-                            if (exists) {
-                                // success -> complete onboarding and navigate
+                            if (success) {
                                 viewModel.completeOnboarding()
-//                                onOnboardingComplete()
                             } else {
-                                // quick user feedback
                                 withContext(Dispatchers.Main) {
-                                    Toast.makeText(context, "College not found / invalid details", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        "No account found with this email",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                             }
                         }
@@ -197,6 +206,7 @@ fun OnboardingScreen(
                     fontWeight = FontWeight.SemiBold
                 )
             }
+
 
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -522,6 +532,132 @@ fun HorizontalPagerIndicator(
 }
 
 // --- add this helper function near the bottom of the file (or in a suitable utils/VM) ---
+
+suspend fun checkTeacher(collegeEmail: String): JSONObject? = withContext(Dispatchers.IO) {
+    val base = "https://attendance-app-backend-zr4c.onrender.com"
+    val eEmail = try { URLEncoder.encode(collegeEmail.trim().lowercase(), "utf-8") } catch (e: Exception) { collegeEmail.trim().lowercase() }
+    val endpoint = "$base/api/teacher/check/$eEmail"
+    val url = URL(endpoint)
+    val conn = (url.openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 10_000
+        readTimeout = 10_000
+    }
+
+    try {
+        val code = conn.responseCode
+        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        val responseText = stream.bufferedReader().use { it.readText() }
+        val responseJson = JSONObject(responseText)
+        val exists = responseJson.optBoolean("exists", false)
+        if (exists && responseJson.has("data") && !responseJson.isNull("data")) {
+            return@withContext responseJson.getJSONObject("data")
+        }
+        return@withContext null
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return@withContext null
+    } finally {
+        conn.disconnect()
+    }
+}
+
+suspend fun checkStudent(collegeEmail: String): JSONObject? = withContext(Dispatchers.IO) {
+    val base = "https://attendance-app-backend-zr4c.onrender.com"
+    val eEmail = try { URLEncoder.encode(collegeEmail.trim().lowercase(), "utf-8") } catch (e: Exception) { collegeEmail.trim().lowercase() }
+    val endpoint = "$base/api/student/check/$eEmail"
+    val url = URL(endpoint)
+    val conn = (url.openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 10_000
+        readTimeout = 10_000
+    }
+
+    try {
+        val code = conn.responseCode
+        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        val responseText = stream.bufferedReader().use { it.readText() }
+        val responseJson = JSONObject(responseText)
+        val exists = responseJson.optBoolean("exists", false)
+        if (exists && responseJson.has("data") && !responseJson.isNull("data")) {
+            return@withContext responseJson.getJSONObject("data")
+        }
+        return@withContext null
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return@withContext null
+    } finally {
+        conn.disconnect()
+    }
+}
+
+// ---------- Save-to-DataStore helpers ----------
+
+/**
+ * Teacher: save ROLE, NAME, EMAIL. Do NOT set COLLEGE or RollNumber.
+ * Returns true if teacher found and saved; false otherwise.
+ */
+suspend fun checkTeacherAndSave(
+    email: String,
+    dataStore: DataStoreManager
+): Boolean = withContext(Dispatchers.IO) {
+    val teacherJson = checkTeacher(email)
+    if (teacherJson == null) return@withContext false
+
+    val name = teacherJson.optString("fullname", "")
+    val collegeEmail = teacherJson.optString("collegeEmail", email)
+    val role = teacherJson.optString("role", "TEACHER")
+
+    // save values
+    try {
+        dataStore.setName(name)
+        dataStore.setEmail(collegeEmail)
+        dataStore.setRole(role)
+        // teacher: do NOT set COLLEGE or RollNumber (per your requirement)
+        dataStore.setStudent(false)
+        dataStore.setLoggedIn(true)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return@withContext false
+    }
+
+    return@withContext true
+}
+
+/**
+ * Student: save ROLE, NAME, EMAIL, RollNumber. Do NOT set COLLEGE.
+ * Returns true if student found and saved; false otherwise.
+ */
+suspend fun checkStudentAndSave(
+    email: String,
+    dataStore: DataStoreManager
+): Boolean = withContext(Dispatchers.IO) {
+    val studentJson = checkStudent(email)
+    if (studentJson == null) return@withContext false
+
+    val name = studentJson.optString("fullname", "")
+    val collegeEmail = studentJson.optString("collegeEmail", email)
+    val role = studentJson.optString("role", "STUDENT")
+    val rollNumber = studentJson.optString("roll_number", "")
+
+    // save values
+    try {
+        dataStore.setName(name)
+        dataStore.setEmail(collegeEmail)
+        dataStore.setRole(role)
+        // Save roll number (your DataStore method is named `RollNumber`)
+        dataStore.RollNumber(rollNumber)
+        // do NOT set COLLEGE (per your requirement)
+        dataStore.setStudent(true)
+        dataStore.setLoggedIn(true)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return@withContext false
+    }
+
+    return@withContext true
+}
+
 suspend fun checkCollegeNetwork(
     collegeEmail: String,
     collegeName: String,

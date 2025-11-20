@@ -1,7 +1,6 @@
 package com.example.attendance_android.components
 
 import android.content.res.Configuration
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,7 +35,7 @@ data class ClassItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StudentHomeScreen(
+fun StudentScreenContent(
     navController: NavController? = null,                           // optional navController
     currentClass: ClassItem? = null,
     previousClasses: List<ClassItem> = emptyList(),
@@ -69,15 +68,11 @@ fun StudentHomeScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("Student Home") })
-        }
-    ) { padding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             // Current class card
@@ -154,7 +149,47 @@ fun StudentHomeScreen(
             }
         }
     }
+
+
+@Composable
+fun StudentHomeScreen(
+    navController: NavController? = null,
+    currentClass: ClassItem? = null,
+    previousClasses: List<ClassItem> = emptyList(),
+    onMarkAttendance: (ClassItem) -> Unit = {}
+) {
+    Scaffold(
+        topBar = {
+            // Use your header composable (it will be placed below status bar by Scaffold)
+            HeaderWithProfile(fullname = "Kalyan", collegeName = "GVPCE", onProfileClick = {
+                // optional profile click
+            })
+        },
+        bottomBar = {
+            FooterNavPrimary(
+                onHome = { /* navController?.navigate(NavRoutes.Home.route) */ },
+                onClasses = { /* navController?.navigate(NavRoutes.Classes.route) */ },
+                onSettings = { /* navController?.navigate(NavRoutes.Settings.route) */ },
+                selected = "HOME"
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
+        // IMPORTANT: apply innerPadding so content is not hidden behind bars
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+        ) {
+            StudentScreenContent(
+                navController = navController,
+                currentClass = currentClass,
+                previousClasses = previousClasses,
+                onMarkAttendance = onMarkAttendance
+            )
+        }
+    }
 }
+
 
 @Composable
 private fun PreviousClassRow(cls: ClassItem, onClick: () -> Unit) {
