@@ -13,7 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.attendance_android.components.OnboardingScreen
 import kotlinx.coroutines.delay
-import com.example.attendance_android.components.HomeScreen
+import com.example.attendance_android.components.StudentHomeScreen
 
 // Defines the routes for navigation
 
@@ -52,10 +52,11 @@ fun Navigation(
                     onOnboardingComplete()
                 }
             )
+
         }
         composable(NavRoutes.Home.route) {
             // Your HomeScreen component
-            HomeScreen(navController)
+            StudentHomeScreen(navController)
         }
 
 
