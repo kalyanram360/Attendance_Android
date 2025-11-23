@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -16,6 +17,7 @@ import kotlinx.coroutines.delay
 import com.example.attendance_android.components.StudentHomeScreen
 import com.example.attendance_android.components.TeacherHomeScreen
 import com.example.attendance_android.components.TeacherBLE
+import com.example.attendance_android.ViewModels.TeacherClassViewModel
 // Defines the routes for navigation
 
 
@@ -65,8 +67,12 @@ fun Navigation(
         }
 
         composable(NavRoutes.TeacherBLE.route) {
-            // Your TeacherBLE component
-            TeacherBLE(navController=navController)
+            // Scope ViewModel to this navigation entry
+            val viewModel: TeacherClassViewModel = viewModel(it)
+            TeacherBLE(
+                navController = navController,
+                viewModel = viewModel
+            )
         }
 
     }

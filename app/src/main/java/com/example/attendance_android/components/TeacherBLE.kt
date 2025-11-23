@@ -10,8 +10,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.attendance_android.NavRoutes
+import com.example.attendance_android.ViewModels.TeacherClassViewModel
 
 /**
  * Teacher Home screen: select Year, Branch, Section and Start Class
@@ -28,18 +30,21 @@ fun TeacherBLE(
     availableYears: List<String> = listOf("I", "II", "III", "IV"),
     availableBranches: List<String> = listOf("CSE", "ECE", "ME", "CE"),
     availableSections: List<String> = listOf("A", "B", "C"),
-    initialYear: String? = null,
-    initialBranch: String? = null,
-    initialSection: String? = null,
     fullname: String = "Professor",
     collegeName: String = "GVPCE",
     onStartClass: (year: String, branch: String, section: String) -> Unit = { _, _, _ -> },
-    navController: NavController
+    navController: NavController,
+    viewModel: TeacherClassViewModel = viewModel()
 ) {
-    // state for selected values
-    var selectedYear by remember { mutableStateOf(initialYear ?: "") }
-    var selectedBranch by remember { mutableStateOf(initialBranch ?: "") }
-    var selectedSection by remember { mutableStateOf(initialSection ?: "") }
+    // Collect state from ViewModel
+    val yearValue by viewModel.year.collectAsState()
+    val branchValue by viewModel.branch.collectAsState()
+    val sectionValue by viewModel.section.collectAsState()
+    
+    // Convert year Int to String for display
+    val selectedYear = if (yearValue > 0) availableYears.getOrNull(yearValue - 1) ?: "" else ""
+    val selectedBranch = branchValue
+    val selectedSection = sectionValue
 
     // dropdown expanded flags
     var yearExpanded by remember { mutableStateOf(false) }
@@ -93,11 +98,11 @@ fun TeacherBLE(
                 expanded = yearExpanded,
                 onDismissRequest = { yearExpanded = false }
             ) {
-                availableYears.forEach { year ->
+                availableYears.forEachIndexed { index, year ->
                     DropdownMenuItem(
                         text = { Text(year) },
                         onClick = {
-                            selectedYear = year
+                            viewModel.updateYear(index + 1)
                             yearExpanded = false
                         }
                     )
@@ -130,7 +135,7 @@ fun TeacherBLE(
                     DropdownMenuItem(
                         text = { Text(branch) },
                         onClick = {
-                            selectedBranch = branch
+                            viewModel.updateBranch(branch)
                             branchExpanded = false
                         }
                     )
@@ -163,7 +168,7 @@ fun TeacherBLE(
                     DropdownMenuItem(
                         text = { Text(section) },
                         onClick = {
-                            selectedSection = section
+                            viewModel.updateSection(section)
                             sectionExpanded = false
                         }
                     )
@@ -222,18 +227,3 @@ fun TeacherBLE(
     }
 }
 
-//
-//
-//@Preview(showBackground = true)
-//@Composable
-//fun TeacherHomePreview() {
-//    TeacherBLE(
-//        availableYears = listOf("I", "II", "III", "IV"),
-//        availableBranches = listOf("CSE", "ECE", "ME"),
-//        availableSections = listOf("A", "B"),
-//        onStartClass = { year, branch, section ->
-//            // preview callback - no-op
-//        },
-//        navController = N
-//    )
-//}

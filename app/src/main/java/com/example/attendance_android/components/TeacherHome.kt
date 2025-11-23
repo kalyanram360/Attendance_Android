@@ -66,6 +66,7 @@ fun TeacherHomeScreen(
                             // navigate to bleAdvertise route
                             navController.navigate(NavRoutes.TeacherBLE.route) {
                                 launchSingleTop = true
+                                restoreState=true
                             }
                         },
                         modifier = Modifier
