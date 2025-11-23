@@ -67,5 +67,11 @@ dependencies {
 //    implementation ("com.google.accompanist:accompanist-navigation-animation:<version>")
 // only if using Hilt
 // optionally for animation:
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3") // or current
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation ("androidx.navigation:navigation-compose:2.6.0")
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
+    // okhttp is optional (I used HttpURLConnection in the example). If you prefer okhttp:
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
 
 }

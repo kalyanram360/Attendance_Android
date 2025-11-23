@@ -18,6 +18,7 @@ import com.example.attendance_android.components.StudentHomeScreen
 import com.example.attendance_android.components.TeacherHomeScreen
 import com.example.attendance_android.components.TeacherBLE
 import com.example.attendance_android.ViewModels.TeacherClassViewModel
+import com.example.attendance_android.components.AdvertisingScreen
 // Defines the routes for navigation
 
 
@@ -74,6 +75,21 @@ fun Navigation(
                 viewModel = viewModel
             )
         }
+
+        composable("advertising/{year}/{branch}/{section}/{teacherEmail}") { backStackEntry ->
+            val year = backStackEntry.arguments?.getString("year") ?: ""
+            val branch = backStackEntry.arguments?.getString("branch") ?: ""
+            val section = backStackEntry.arguments?.getString("section") ?: ""
+            val teacherEmail = backStackEntry.arguments?.getString("teacherEmail") ?: ""
+            AdvertisingScreen(
+                navController = navController,
+                year = year,
+                branch = branch,
+                section = section,
+                teacherEmail = teacherEmail
+            )
+        }
+
 
     }
 }

@@ -14,7 +14,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.attendance_android.NavRoutes
 import com.example.attendance_android.ViewModels.TeacherClassViewModel
-
+import java.net.URLEncoder
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 /**
  * Teacher Home screen: select Year, Branch, Section and Start Class
  *
@@ -45,6 +47,7 @@ fun TeacherBLE(
     val selectedYear = if (yearValue > 0) availableYears.getOrNull(yearValue - 1) ?: "" else ""
     val selectedBranch = branchValue
     val selectedSection = sectionValue
+    val scope = rememberCoroutineScope()
 
     // dropdown expanded flags
     var yearExpanded by remember { mutableStateOf(false) }
@@ -189,13 +192,25 @@ fun TeacherBLE(
         )
 
         Spacer(modifier = Modifier.height(24.dp))
-
         // Start Class Button aligned to center horizontally
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             Button(
                 onClick = {
                     if (canStart) {
-                        onStartClass(selectedYear, selectedBranch, selectedSection)
+                        // encode path segments to be safe for navigation
+                        val eYear = try { URLEncoder.encode(selectedYear, "utf-8") } catch (_: Exception) { selectedYear }
+                        val eBranch = try { URLEncoder.encode(selectedBranch, "utf-8") } catch (_: Exception) { selectedBranch }
+                        val eSection = try { URLEncoder.encode(selectedSection, "utf-8") } catch (_: Exception) { selectedSection }
+                        val eEmail = try { URLEncoder.encode("teacher@gvpce.ac.in", "utf-8") } catch (_: Exception) { "teacher@gvpce.ac.in" }
+                        // navigate to Advertising route with parameters
+                        // route example: "advertising/{year}/{branch}/{section}"
+                        // Make sure you registered this route in NavHost (see previous message)
+                        scope.launch {
+                            navController.navigate("advertising/$eYear/$eBranch/$eSection/$eEmail") {
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     }
                 },
                 enabled = canStart,
