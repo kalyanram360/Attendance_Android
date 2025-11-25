@@ -22,10 +22,31 @@ class DataStoreManager(private val context: Context) {
         val COLLEGE = stringPreferencesKey("college")
         val RollNumber = stringPreferencesKey("roll_number")
 
+        val BRANCH = stringPreferencesKey("branch")
+        val SECTION = stringPreferencesKey("section")
+        val YEAR = stringPreferencesKey("year")
+
+
 
     }
 
     // Write - set flag
+    suspend fun setBranch(value: String) {
+        context.dataStore.edit { prefs ->
+            prefs[BRANCH] = value
+        }
+    }
+    suspend fun setSection(value: String) {
+        context.dataStore.edit { prefs ->
+            prefs[SECTION] = value
+        }
+    }
+    suspend fun setYear(value: String) {
+        context.dataStore.edit { prefs ->
+            prefs[YEAR] = value
+        }
+    }
+
     suspend fun setLoggedIn(isLoggedIn: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[IS_LOGGED_IN] = isLoggedIn
@@ -72,6 +93,20 @@ class DataStoreManager(private val context: Context) {
 
 
     // Read - returns Flow<Boolean>
+    val branch: Flow<String> =
+        context.dataStore.data.map { prefs ->
+            prefs[BRANCH] ?: ""
+        }
+    val section: Flow<String> =
+        context.dataStore.data.map { prefs ->
+            prefs[SECTION] ?: ""
+        }
+    val year: Flow<String> =
+        context.dataStore.data.map { prefs ->
+            prefs[YEAR] ?: ""
+        }
+
+
     val isLoggedIn: Flow<Boolean> =
         context.dataStore.data.map { prefs ->
             prefs[IS_LOGGED_IN] ?: false
@@ -89,5 +124,6 @@ class DataStoreManager(private val context: Context) {
         context.dataStore.data.map { prefs ->
             prefs[ROLE] ?: ""
         }
+
 
 }
