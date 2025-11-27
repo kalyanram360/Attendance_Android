@@ -80,7 +80,7 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    suspend fun RollNumber(value: String) {
+    suspend fun rollNumber(value: String) {
         context.dataStore.edit { prefs ->
             prefs[RollNumber] = value
         }
@@ -105,7 +105,10 @@ class DataStoreManager(private val context: Context) {
         context.dataStore.data.map { prefs ->
             prefs[YEAR] ?: ""
         }
-
+    val rollNumber: Flow<String> =
+        context.dataStore.data.map { prefs ->
+            prefs[RollNumber] ?: ""
+        }
 
     val isLoggedIn: Flow<Boolean> =
         context.dataStore.data.map { prefs ->

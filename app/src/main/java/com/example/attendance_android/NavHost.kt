@@ -19,6 +19,8 @@ import com.example.attendance_android.components.TeacherHomeScreen
 import com.example.attendance_android.components.TeacherBLE
 import com.example.attendance_android.ViewModels.TeacherClassViewModel
 import com.example.attendance_android.components.AdvertisingScreen
+import com.example.attendance_android.components.StudentBleScreen
+
 // Defines the routes for navigation
 
 
@@ -89,6 +91,16 @@ fun Navigation(
                 teacherEmail = teacherEmail
             )
         }
+
+        composable("student_ble/{token}/{studentRoll}") {
+            StudentBleScreen(
+                navController = navController,
+                tokenToMatch = it.arguments?.getString("token") ?: "",
+                studentRollNo = it.arguments?.getString("studentRoll") ?: ""
+            )
+        }
+
+
 
 
     }

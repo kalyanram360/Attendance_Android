@@ -650,7 +650,7 @@ suspend fun checkStudentAndSave(
         dataStore.setEmail(collegeEmail)
         dataStore.setRole(role)
         // Save roll number (your DataStore method is named `RollNumber`)
-        dataStore.RollNumber(rollNumber)
+        dataStore.rollNumber(rollNumber)
         // do NOT set COLLEGE (per your requirement)
         dataStore.setStudent(true)
         dataStore.setLoggedIn(true)
