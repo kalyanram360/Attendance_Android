@@ -11,7 +11,6 @@ import android.os.ParcelUuid
 import android.util.Log
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,10 +31,10 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.*
-import android.R.attr.tag
 import android.content.pm.PackageManager
 
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavHostController
 
 
 // Simple data class for attended student list (dummy)
@@ -262,7 +261,7 @@ fun AdvertisingScreen(
     // UI layout
     Scaffold(
         topBar = {
-            HeaderWithProfile(fullname = teacherEmail.split("@").firstOrNull() ?: "T", collegeName = "GVPCE")
+            HeaderWithProfile(fullname = teacherEmail.split("@").firstOrNull() ?: "T", collegeName = "GVPCE", navController = navController)
         }
     ) { innerPadding ->
         Column(

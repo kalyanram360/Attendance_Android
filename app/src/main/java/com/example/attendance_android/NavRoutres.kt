@@ -8,5 +8,7 @@ sealed class NavRoutes(val route: String) {
 
     object TeacherBLE : NavRoutes("teacher_ble")
 
-    object StudentBLE : NavRoutes("student_ble")
+
+
+    object profile : NavRoutes("profile")
 }

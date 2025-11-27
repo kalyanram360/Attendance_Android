@@ -80,7 +80,7 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    suspend fun rollNumber(value: String) {
+    suspend fun setrollNumber(value: String) {
         context.dataStore.edit { prefs ->
             prefs[RollNumber] = value
         }
@@ -91,7 +91,21 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
+    // Clear all preferences (logout)
+    suspend fun clearAllPreferences() {
+        context.dataStore.edit { prefs ->
+            prefs.clear()
+        }
+    }
 
+    val name : Flow<String> =
+        context.dataStore.data.map { prefs ->
+            prefs[NAME] ?: ""
+        }
+    val email: Flow<String> =
+        context.dataStore.data.map { prefs ->
+            prefs[EMAIL] ?: ""
+        }
     // Read - returns Flow<Boolean>
     val branch: Flow<String> =
         context.dataStore.data.map { prefs ->

@@ -635,10 +635,10 @@ suspend fun checkStudentAndSave(
     val studentJson = checkStudent(email)
     if (studentJson == null) return@withContext false
 
-    val name = studentJson.optString("fullname", "")
+    val name = studentJson.optString("name", "")
     val collegeEmail = studentJson.optString("collegeEmail", email)
     val role = studentJson.optString("role", "STUDENT")
-    val rollNumber = studentJson.optString("roll_number", "")
+    val rollNumber = studentJson.optString("rollno", "")
     val branch = studentJson.optString("branch", "")
     val section = studentJson.optString("section", "")
     val year = studentJson.optString("year", "")
@@ -650,7 +650,7 @@ suspend fun checkStudentAndSave(
         dataStore.setEmail(collegeEmail)
         dataStore.setRole(role)
         // Save roll number (your DataStore method is named `RollNumber`)
-        dataStore.rollNumber(rollNumber)
+        dataStore.setrollNumber(rollNumber)
         // do NOT set COLLEGE (per your requirement)
         dataStore.setStudent(true)
         dataStore.setLoggedIn(true)

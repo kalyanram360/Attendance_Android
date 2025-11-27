@@ -1266,9 +1266,7 @@ fun StudentHomeScreen(
     Scaffold(
         topBar = {
             // Use your header composable (it will be placed below status bar by Scaffold)
-            HeaderWithProfile(fullname = "Kalyan", collegeName = "GVPCE", onProfileClick = {
-                // optional profile click
-            })
+            HeaderWithProfile(fullname = "Kalyan", collegeName = "GVPCE", navController = navController)
         },
         bottomBar = {
             FooterNavPrimary(

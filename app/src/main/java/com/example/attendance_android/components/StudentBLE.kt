@@ -26,11 +26,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
-import java.util.*
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
@@ -222,7 +220,7 @@ fun StudentBleScreen(
     // UI
     Scaffold(
         topBar = {
-            HeaderWithProfile(fullname = "You", collegeName = "GVPCE")
+            HeaderWithProfile(fullname = "You", collegeName = "GVPCE", navController = navController)
         },
         bottomBar = {
             FooterNavPrimary(

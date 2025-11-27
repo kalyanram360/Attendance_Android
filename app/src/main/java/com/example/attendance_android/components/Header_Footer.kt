@@ -28,21 +28,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
+import com.example.attendance_android.NavRoutes
+import androidx.compose.ui.platform.LocalContext
+
 // ------------------ Header: Left profile initial + College name ------------------
+
 @Composable
 fun HeaderWithProfile(
+    navController:  NavController? = null,
     fullname: String,
-    collegeName: String = "GVPCE",
-    onProfileClick: () -> Unit = {}
+    collegeName: String = "GVPCE"
 ) {
-    val initial = remember(fullname) { fullname.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "P" }
+    val initial = remember(fullname) {
+        fullname.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "P"
+    }
 
     Surface(
         tonalElevation = 2.dp,
@@ -57,81 +63,44 @@ fun HeaderWithProfile(
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = 16.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // circular initial
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable { onProfileClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = initial,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
 
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Text(
-                    text = collegeName,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Start
-                )
-            }
-
-            // optional profile icon on the far end (small)
-            IconButton(onClick = onProfileClick) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Profile",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-// ------------------ Header: Centered college title variant ------------------
-@Composable
-fun HeaderCenteredTitle(
-    collegeName: String = "GVPCE",
-    showProfileIcon: Boolean = true,
-    onProfileClick: () -> Unit = {}
-) {
-    Surface(
-        tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+            // Left — College Name
             Text(
                 text = collegeName,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                modifier = Modifier.align(Alignment.Center),
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            if (showProfileIcon) {
-                IconButton(
-                    onClick = onProfileClick,
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp)
-                ) {
-                    Icon(imageVector = Icons.Default.Person, contentDescription = "Profile")
-                }
+            // Right — Profile Circle (navigates automatically)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clickable {
+                        navController?.navigate(NavRoutes.profile.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = initial,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
         }
     }
 }
+
+
+
+
+// ------------------ Header: Centered college title variant ------------------
 
 // ------------------ Footer: Primary with labels ------------------
 @Composable
@@ -210,60 +179,13 @@ private fun FooterItem(
 }
 
 // ------------------ Footer: Compact (icons only) ------------------
-@Composable
-fun FooterNavCompact(
-    onHome: () -> Unit = {},
-    onClasses: () -> Unit = {},
-    onSettings: () -> Unit = {},
-    selectedIndex: Int = 0
-) {
-    Surface(
-        tonalElevation = 8.dp,
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-    ) {
-        Row(
-            Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onHome) {
-                Icon(
-                    imageVector = Icons.Default.Home,
-                    contentDescription = "Home",
-                    tint = if (selectedIndex == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            IconButton(onClick = onClasses) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Classes",
-                    tint = if (selectedIndex == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            IconButton(onClick = onSettings) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
-                    tint = if (selectedIndex == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
 
 // ------------------ Usage preview helpers ------------------
 @Preview(showBackground = true)
 @Composable
 fun HeaderFooterPreview() {
     Column(Modifier.fillMaxSize()) {
-        HeaderWithProfile(fullname = "Kalyan", collegeName = "GVPCE")
+        HeaderWithProfile(navController = rememberNavController(), fullname = "Kalyan", collegeName = "GVPCE")
         Box(Modifier.weight(1f)) { /* content */ }
         FooterNavPrimary()
     }

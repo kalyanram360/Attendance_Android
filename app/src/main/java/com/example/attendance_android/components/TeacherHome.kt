@@ -8,8 +8,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.attendance_android.components.FooterNavPrimary
-import com.example.attendance_android.components.HeaderWithProfile
 import com.example.attendance_android.NavRoutes
 
 @Composable
@@ -21,7 +19,7 @@ fun TeacherHomeScreen(
 ) {
     Scaffold(
         topBar = {
-            HeaderWithProfile(fullname = fullname, collegeName = collegeName) // assumes this composable exists
+            HeaderWithProfile(fullname = fullname, collegeName = collegeName, navController = navController) // assumes this composable exists
         },
         bottomBar = {
             FooterNavPrimary(
