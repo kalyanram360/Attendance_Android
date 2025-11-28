@@ -332,7 +332,7 @@ suspend fun markAttendance(
     try {
         // URL encode the roll number to handle special characters
         val encodedRoll = URLEncoder.encode(studentRoll, "UTF-8")
-        val urlString = "$backendBaseUrl/api/class/$token/mark/$encodedRoll"
+        val urlString = "$backendBaseUrl/api/class/mark/$token/$encodedRoll"
 
         Log.d("markAttendance", "Calling: $urlString")
 
