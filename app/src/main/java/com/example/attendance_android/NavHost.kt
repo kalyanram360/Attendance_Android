@@ -79,16 +79,19 @@ fun Navigation(
             )
         }
 
-        composable("advertising/{year}/{branch}/{section}/{teacherEmail}") { backStackEntry ->
+        composable("advertising/{year}/{branch}/{section}/{Subject}/{teacherEmail}") { backStackEntry ->
             val year = backStackEntry.arguments?.getString("year") ?: ""
             val branch = backStackEntry.arguments?.getString("branch") ?: ""
             val section = backStackEntry.arguments?.getString("section") ?: ""
             val teacherEmail = backStackEntry.arguments?.getString("teacherEmail") ?: ""
+            val subject = backStackEntry.arguments?.getString("Subject") ?: ""
+
             AdvertisingScreen(
                 navController = navController,
                 year = year,
                 branch = branch,
                 section = section,
+                Subject = subject,
                 teacherEmail = teacherEmail
             )
         }

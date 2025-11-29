@@ -19,6 +19,10 @@ class TeacherClassViewModel : ViewModel() {
     private val _section = MutableStateFlow("")
     val section: StateFlow<String> = _section.asStateFlow()
 
+    // Subject
+    private val _subject = MutableStateFlow("")
+    val subject: StateFlow<String> = _subject.asStateFlow()
+
     // ----------- Update Methods -------------
 
     fun updateYear(value: Int) {
@@ -32,11 +36,15 @@ class TeacherClassViewModel : ViewModel() {
     fun updateSection(value: String) {
         _section.value = value
     }
+    fun updateSubject(value: String) {
+        _subject.value = value
+    }
 
     // Convenience: all three at once
-    fun updateAll(year: Int, branch: String, section: String) {
+    fun updateAll(year: Int, branch: String, section: String, subject: String) {
         _year.value = year
         _branch.value = branch
         _section.value = section
+        _subject.value = subject
     }
 }

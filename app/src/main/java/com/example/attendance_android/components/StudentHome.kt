@@ -1235,7 +1235,7 @@ suspend fun fetchCurrentClassForStudent(
                 return@withContext null
             }
 
-            val subjectDisplay = "Class - $branch $section"
+            val subjectDisplay = data.optString("subject")
 
             return@withContext ClassItem(
                 id = (data.optString("_id", token)).hashCode(),

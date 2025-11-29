@@ -49,6 +49,7 @@ fun AdvertisingScreen(
     year: String,
     branch: String,
     section: String,
+    Subject : String,
     teacherEmail: String,               // pass teacher's college email (required by backend)
     backendBaseUrl: String = "https://attendance-app-backend-zr4c.onrender.com"
 ) {
@@ -180,6 +181,7 @@ fun AdvertisingScreen(
         teacherEmail: String,
         branch: String,
         section: String,
+        subject: String,
         year: String,
         token: String
     ): Pair<Boolean, String?> = withContext(Dispatchers.IO) {
@@ -205,6 +207,7 @@ fun AdvertisingScreen(
                 put("section", section.trim())
                 put("year", changedYear)  // Send as integer
                 put("token", token.trim())
+                put("subject", subject.trim())
             }
 
             Log.d(tag, "Request body: ${body.toString()}")
@@ -312,7 +315,7 @@ fun AdvertisingScreen(
                 posting = true
                 val t = makeToken()
                 token = t
-                val (ok, err) = postCreateClass(teacherEmail, branch, section, year, t)
+                val (ok, err) = postCreateClass(teacherEmail, branch, section, Subject, year, t)
                 posting = false
                 if (!ok) {
                     postingError = err ?: "Failed to create class on server"

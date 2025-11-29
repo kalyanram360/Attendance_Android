@@ -31,6 +31,7 @@ fun TeacherBLE(
     availableYears: List<String> = listOf("I", "II", "III", "IV"),
     availableBranches: List<String> = listOf("CSE", "ECE", "ME", "CE"),
     availableSections: List<String> = listOf("A", "B", "C"),
+    availableSubjects: List<String> = listOf("DS", "OS", "DBMS"),
     fullname: String = "Professor",
     collegeName: String = "GVPCE",
     onStartClass: (year: String, branch: String, section: String) -> Unit = { _, _, _ -> },
@@ -41,17 +42,23 @@ fun TeacherBLE(
     val yearValue by viewModel.year.collectAsState()
     val branchValue by viewModel.branch.collectAsState()
     val sectionValue by viewModel.section.collectAsState()
+    val subjectValue by viewModel.subject.collectAsState()
+
 
     // Convert year Int to String for display
     val selectedYear = if (yearValue > 0) availableYears.getOrNull(yearValue - 1) ?: "" else ""
     val selectedBranch = branchValue
     val selectedSection = sectionValue
+    val selectedSubject = subjectValue
+
     val scope = rememberCoroutineScope()
 
     // dropdown expanded flags
     var yearExpanded by remember { mutableStateOf(false) }
     var branchExpanded by remember { mutableStateOf(false) }
     var sectionExpanded by remember { mutableStateOf(false) }
+    var subjectExpanded by remember { mutableStateOf(false) }
+
 
     // simple derived validation to enable Start button
     val canStart = selectedYear.isNotBlank() && selectedBranch.isNotBlank() && selectedSection.isNotBlank()
@@ -81,7 +88,9 @@ fun TeacherBLE(
             Text(text = "Start a Class", style = MaterialTheme.typography.headlineSmall)
             Spacer(modifier = Modifier.height(18.dp))
 
+
             // Year dropdown
+
             ExposedDropdownMenuBox(
                 expanded = yearExpanded,
                 onExpandedChange = { yearExpanded = !yearExpanded }
@@ -178,6 +187,39 @@ fun TeacherBLE(
                 }
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            //subject dropdown
+            ExposedDropdownMenuBox(
+                expanded = subjectExpanded,
+                onExpandedChange = { subjectExpanded = !subjectExpanded }
+            ) {
+                TextField(
+                    readOnly = true,
+                    value = selectedSubject,
+                    onValueChange = { },
+                    label = { Text("Subject") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subjectExpanded) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor()
+                )
+                ExposedDropdownMenu(
+                    expanded = subjectExpanded,
+                    onDismissRequest = { subjectExpanded = false }
+                ) {
+                    availableSubjects.forEach { subject ->
+                        DropdownMenuItem(
+                            text = { Text(subject) },
+                            onClick = {
+                                viewModel.updateSubject(subject)
+                                subjectExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // Optional quick input: number of students or other details (example)
@@ -200,12 +242,13 @@ fun TeacherBLE(
                             val eYear = try { URLEncoder.encode(selectedYear, "utf-8") } catch (_: Exception) { selectedYear }
                             val eBranch = try { URLEncoder.encode(selectedBranch, "utf-8") } catch (_: Exception) { selectedBranch }
                             val eSection = try { URLEncoder.encode(selectedSection, "utf-8") } catch (_: Exception) { selectedSection }
+                            val eSubject = try { URLEncoder.encode(selectedSubject, "utf-8") } catch (_: Exception) { selectedSubject }
                             val eEmail = try { URLEncoder.encode("teacher@gvpce.ac.in", "utf-8") } catch (_: Exception) { "teacher@gvpce.ac.in" }
                             // navigate to Advertising route with parameters
                             // route example: "advertising/{year}/{branch}/{section}"
                             // Make sure you registered this route in NavHost (see previous message)
                             scope.launch {
-                                navController.navigate("advertising/$eYear/$eBranch/$eSection/$eEmail") {
+                                navController.navigate("advertising/$eYear/$eBranch/$eSection/$eSubject/$eEmail") {
                                     launchSingleTop = true
                                     restoreState = true
                                 }
