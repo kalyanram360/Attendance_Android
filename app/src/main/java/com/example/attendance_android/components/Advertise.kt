@@ -29,6 +29,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
+import java.net.URLEncoder
 import java.net.URL
 import java.util.*
 import android.content.pm.PackageManager
@@ -62,12 +63,8 @@ fun AdvertisingScreen(
     var advertising by remember { mutableStateOf(false) }
     var advError by remember { mutableStateOf<String?>(null) }
 
-    // Dummy attended list (replace with real incoming attendance)
-    val attended = remember { mutableStateListOf(
-        AttendedStudent("18CS1001","Akhil"),
-        AttendedStudent("18CS1005","Meena"),
-        AttendedStudent("18CS1010","Ravi")
-    ) }
+    // Attended list (populated dynamically from backend)
+    val attended = remember { mutableStateListOf<AttendedStudent>() }
 
     // BLE objects (remember across recompositions)
     val btAdapter = remember { BluetoothAdapter.getDefaultAdapter() }
@@ -243,6 +240,51 @@ fun AdvertisingScreen(
         }
     }
 
+    // Fetch branches/students for token
+    suspend fun fetchClassBranches(token: String): List<AttendedStudent> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$backendBaseUrl/api/class/branches/${URLEncoder.encode(token, "UTF-8")}")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 10_000
+                readTimeout = 10_000
+            }
+
+            val code = conn.responseCode
+            val text = if (code in 200..299) conn.inputStream.bufferedReader().use { it.readText() } else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            if (code !in 200..299) return@withContext emptyList()
+
+            val json = JSONObject(text)
+            if (!json.optBoolean("success", false)) return@withContext emptyList()
+
+            val data = json.optJSONObject("data") ?: return@withContext emptyList()
+            val branches = data.optJSONArray("branches") ?: return@withContext emptyList()
+
+            val presentStudents = mutableListOf<AttendedStudent>()
+            for (i in 0 until branches.length()) {
+                val branchObj = branches.getJSONObject(i)
+                val sections = branchObj.optJSONArray("sections") ?: continue
+                for (j in 0 until sections.length()) {
+                    val sectionObj = sections.getJSONObject(j)
+                    val students = sectionObj.optJSONArray("students") ?: continue
+                    for (k in 0 until students.length()) {
+                        val stu = students.getJSONObject(k)
+                        if (stu.optBoolean("present", false)) {
+                            presentStudents.add(AttendedStudent(stu.optString("rollNo", ""), stu.optString("name", "")))
+                        }
+                    }
+                }
+            }
+
+            return@withContext presentStudents
+        } catch (e: Exception) {
+            Log.e(tag, "fetchClassBranches error: ${e.message}")
+            return@withContext emptyList()
+        }
+    }
+
 
 
     // Permissions check (very basic). For Android 12+ you need BLUETOOTH_ADVERTISE and BLUETOOTH_CONNECT
@@ -264,6 +306,30 @@ fun AdvertisingScreen(
             HeaderWithProfile(fullname = teacherEmail.split("@").firstOrNull() ?: "T", collegeName = "GVPCE", navController = navController)
         }
     ) { innerPadding ->
+        // When the composable enters composition, ensure a token exists in backend (create once)
+        LaunchedEffect(Unit) {
+            if (token == null) {
+                posting = true
+                val t = makeToken()
+                token = t
+                val (ok, err) = postCreateClass(teacherEmail, branch, section, year, t)
+                posting = false
+                if (!ok) {
+                    postingError = err ?: "Failed to create class on server"
+                }
+            }
+
+            // Start polling present students every 5 seconds while composable is active
+            while (true) {
+                val curToken = token
+                if (!curToken.isNullOrBlank()) {
+                    val list = fetchClassBranches(curToken)
+                    attended.clear()
+                    attended.addAll(list)
+                }
+                kotlinx.coroutines.delay(5000)
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -323,30 +389,21 @@ fun AdvertisingScreen(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 Button(
                     onClick = {
-                        // Generate token and POST + start advertise
                         scope.launch {
                             if (!hasBluetoothAdvertisePermission()) {
                                 advError = "Missing BLUETOOTH_ADVERTISE/CONNECT permission (Android 12+). Request runtime permissions."
                                 return@launch
                             }
 
-                            posting = true
-                            postingError = null
-                            advError = null
-
-                            val t = makeToken()
-                            token = t
-
-                            val (ok, err) = postCreateClass(teacherEmail, branch, section, year, t)
-                            posting = false
-                            if (!ok) {
-                                postingError = err ?: "Unknown error"
-                                token = null
+                            val curToken = token
+                            if (curToken.isNullOrBlank()) {
+                                postingError = "Token not ready yet. Try again in a moment."
                                 return@launch
                             }
 
-                            // start advertising
-                            val started = startBleAdvertising(t)
+                            advError = null
+                            // start advertising using the existing token (do not create a new DB instance)
+                            val started = startBleAdvertising(curToken)
                             advertising = started
                             if (!started) advError = advError ?: "Failed to start advertising"
                         }
