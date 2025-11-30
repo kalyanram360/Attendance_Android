@@ -36,10 +36,17 @@ import android.content.pm.PackageManager
 
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
-
+import com.example.attendance_android.NavRoutes
+  
 
 // Simple data class for attended student list (dummy)
 data class AttendedStudent(val rollNo: String, val name: String)
+
+// Data models for class details
+data class ClassStudent(val rollNo: String, val name: String, var present: Boolean)
+data class ClassSection(val sectionName: String, val year: Int, val students: MutableList<ClassStudent>)
+data class ClassBranch(val branchName: String, val sections: MutableList<ClassSection>)
+
 
 // AdvertisingScreen composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -171,6 +178,81 @@ fun AdvertisingScreen(
             Log.e("AdvertisingScreen", "Error stopping advertising: ${e.message}")
             e.printStackTrace()
             advError = "Failed to stop advertising: ${e.message}"
+        }
+    }
+
+    // Fetch full class branches/details (sections+students with present flag)
+    suspend fun fetchFullClassDetails(token: String): List<ClassBranch> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$backendBaseUrl/api/class/branches/${URLEncoder.encode(token, "UTF-8")}")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 10_000
+                readTimeout = 10_000
+            }
+
+            val code = conn.responseCode
+            val text = if (code in 200..299) conn.inputStream.bufferedReader().use { it.readText() } else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            if (code !in 200..299) return@withContext emptyList()
+
+            val json = JSONObject(text)
+            if (!json.optBoolean("success", false)) return@withContext emptyList()
+
+            val data = json.optJSONObject("data") ?: return@withContext emptyList()
+            val branchesArr = data.optJSONArray("branches") ?: return@withContext emptyList()
+
+            val branches = mutableListOf<ClassBranch>()
+            for (i in 0 until branchesArr.length()) {
+                val bObj = branchesArr.getJSONObject(i)
+                val branchName = bObj.optString("branchName", "")
+                val sectionsArr = bObj.optJSONArray("sections") ?: continue
+                val sections = mutableListOf<ClassSection>()
+                for (j in 0 until sectionsArr.length()) {
+                    val sObj = sectionsArr.getJSONObject(j)
+                    val sectionName = sObj.optString("sectionName", "")
+                    val year = sObj.optInt("year", 0)
+                    val studentsArr = sObj.optJSONArray("students") ?: continue
+                    val students = mutableListOf<ClassStudent>()
+                    for (k in 0 until studentsArr.length()) {
+                        val st = studentsArr.getJSONObject(k)
+                        students.add(ClassStudent(st.optString("rollNo", ""), st.optString("name", ""), st.optBoolean("present", false)))
+                    }
+                    sections.add(ClassSection(sectionName, year, students))
+                }
+                branches.add(ClassBranch(branchName, sections))
+            }
+
+            return@withContext branches
+        } catch (e: Exception) {
+            Log.e(tag, "fetchFullClassDetails error: ${e.message}")
+            return@withContext emptyList()
+        }
+    }
+
+    // Archive class by sending the full class object to backend
+    suspend fun archiveClassOnServer(classObject: JSONObject): Pair<Boolean, String?> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$backendBaseUrl/api/class/archive")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                connectTimeout = 15_000
+                readTimeout = 15_000
+            }
+
+            val body = JSONObject().apply { put("classObject", classObject) }
+            conn.outputStream.use { os -> OutputStreamWriter(os, "UTF-8").use { it.write(body.toString()); it.flush() } }
+
+            val code = conn.responseCode
+            val resp = if (code in 200..299) conn.inputStream.bufferedReader().use { it.readText() } else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+            return@withContext if (code in 200..299) Pair(true, null) else Pair(false, "Server $code: $resp")
+        } catch (e: Exception) {
+            Log.e(tag, "archiveClassOnServer error: ${e.message}")
+            return@withContext Pair(false, e.message)
         }
     }
 
@@ -333,6 +415,11 @@ fun AdvertisingScreen(
                 kotlinx.coroutines.delay(5000)
             }
         }
+                // state to hold full class details for editing/archiving after stop
+                var classDetails by remember { mutableStateOf<List<ClassBranch>?>(null) }
+                var classStopped by remember { mutableStateOf(false) }
+                // editable present map: rollNo -> present
+                val presentMap = remember { mutableStateMapOf<String, Boolean>() }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -418,7 +505,28 @@ fun AdvertisingScreen(
 
                 Button(
                     onClick = {
+                        // Stop advertising and fetch class details for editing
                         stopAdvertising()
+                        classStopped = true
+                        // fetch class full details and populate presentMap
+                        scope.launch {
+                            val curToken = token
+                            if (!curToken.isNullOrBlank()) {
+                                val details = fetchFullClassDetails(curToken)
+                                classDetails = details
+                                presentMap.clear()
+                                // populate presentMap for selected branch/section only
+                                details.forEach { b ->
+                                    if (b.branchName.equals(branch, true)) {
+                                        b.sections.forEach { s ->
+                                            if (s.sectionName.equals(section, true) || s.year == romanToInt(year)) {
+                                                s.students.forEach { st -> presentMap[st.rollNo] = st.present }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     },
                     enabled = advertising
                 ) {
@@ -427,30 +535,124 @@ fun AdvertisingScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+            if (!classStopped) {
+                // show real-time attended students while advertising (read-only)
+                Text("Attended students", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // Dummy attended list
-            Text("Attended students", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                items(attended) { s ->
-                    Card(modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)) {
-                        Row(modifier = Modifier
-                            .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(s.name, fontWeight = FontWeight.SemiBold)
-                                Text(s.rollNo, style = MaterialTheme.typography.bodySmall)
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    items(attended) { s ->
+                        Card(modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)) {
+                            Row(modifier = Modifier
+                                .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(s.name, fontWeight = FontWeight.SemiBold)
+                                    Text(s.rollNo, style = MaterialTheme.typography.bodySmall)
+                                }
+                                Text("Present", color = MaterialTheme.colorScheme.primary)
                             }
-                            Text("Present", color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                // Class stopped: show editable checklist for selected branch/section
+                Text("Edit attendance before archiving", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // find students for given branch+section
+                val studentsForSection = remember(classDetails, branch, section) {
+                    classDetails?.firstOrNull { it.branchName.equals(branch, true) }?.sections
+                        ?.firstOrNull { it.sectionName.equals(section, true) || it.year == romanToInt(year) }
+                        ?.students ?: emptyList()
+                }
+
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    items(studentsForSection) { st ->
+                        val checked = presentMap[st.rollNo] ?: false
+                        Row(modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = checked, onCheckedChange = { v -> presentMap[st.rollNo] = v })
+                            Spacer(Modifier.width(8.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(st.name, fontWeight = FontWeight.SemiBold)
+                                Text(st.rollNo, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Button(onClick = {
+                        // submit modified class object to archive route
+                        scope.launch {
+                            val curToken = token ?: return@launch
+
+                            // Build classObject JSON from classDetails, but update present flags from presentMap
+                            val classJson = JSONObject()
+                            classJson.put("token", curToken)
+                            val teacherObj = JSONObject()
+                            teacherObj.put("name", teacherEmail.split("@").firstOrNull() ?: "Teacher")
+                            teacherObj.put("email", teacherEmail)
+                            classJson.put("teacher", teacherObj)
+                            classJson.put("subject", Subject)
+
+                            val branchesJson = org.json.JSONArray()
+                            classDetails?.forEach { b ->
+                                val bObj = JSONObject()
+                                bObj.put("branchName", b.branchName)
+                                val secs = org.json.JSONArray()
+                                b.sections.forEach { s ->
+                                    val sObj = JSONObject()
+                                    sObj.put("sectionName", s.sectionName)
+                                    sObj.put("year", s.year)
+                                    val studs = org.json.JSONArray()
+                                    s.students.forEach { st ->
+                                        val stuObj = JSONObject()
+                                        stuObj.put("rollNo", st.rollNo)
+                                        stuObj.put("name", st.name)
+                                        stuObj.put("present", presentMap[st.rollNo] ?: st.present)
+                                        studs.put(stuObj)
+                                    }
+                                    sObj.put("students", studs)
+                                    secs.put(sObj)
+                                }
+                                bObj.put("sections", secs)
+                                branchesJson.put(bObj)
+                            }
+                            classJson.put("branches", branchesJson)
+                            val (ok, err) = archiveClassOnServer(classJson)
+                            if (ok) {
+                                // archived successfully; navigate back to teacher home
+                                postingError = null
+                                advError = null
+                                navController?.navigate(NavRoutes.TeacherHome.route) {
+                                    popUpTo(0)
+                                }
+                            } else {
+                                postingError = err ?: "Failed to archive class"
+                            }
+                        }
+                    }) {
+                        Text("Submit & Archive")
+                    }
+
+                    Button(onClick = {
+                        // Cancel editing and resume advertising (if desired)
+                        classStopped = false
+                    }) {
+                        Text("Cancel")
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
         } // Column
     } // Scaffold
 
