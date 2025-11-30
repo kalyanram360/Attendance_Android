@@ -16,6 +16,10 @@ import com.example.attendance_android.ViewModels.TeacherClassViewModel
 import java.net.URLEncoder
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import androidx.datastore.dataStore
+import androidx.compose.ui.platform.LocalContext
+import com.example.attendance_android.data.DataStoreManager
+import androidx.compose.runtime.collectAsState
 /**
  * Teacher Home screen: select Year, Branch, Section and Start Class
  *
@@ -38,6 +42,12 @@ fun TeacherBLE(
     navController: NavController,
     viewModel: TeacherClassViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val dataStore = remember { DataStoreManager(context) }
+    
+    // Collect email from DataStore
+    val teacherEmail by dataStore.email.collectAsState(initial = "")
+    
     // Collect state from ViewModel
     val yearValue by viewModel.year.collectAsState()
     val branchValue by viewModel.branch.collectAsState()
@@ -243,7 +253,7 @@ fun TeacherBLE(
                             val eBranch = try { URLEncoder.encode(selectedBranch, "utf-8") } catch (_: Exception) { selectedBranch }
                             val eSection = try { URLEncoder.encode(selectedSection, "utf-8") } catch (_: Exception) { selectedSection }
                             val eSubject = try { URLEncoder.encode(selectedSubject, "utf-8") } catch (_: Exception) { selectedSubject }
-                            val eEmail = try { URLEncoder.encode("teacher@gvpce.ac.in", "utf-8") } catch (_: Exception) { "teacher@gvpce.ac.in" }
+                            val eEmail = try { URLEncoder.encode(teacherEmail, "utf-8") } catch (_: Exception) { teacherEmail }
                             // navigate to Advertising route with parameters
                             // route example: "advertising/{year}/{branch}/{section}"
                             // Make sure you registered this route in NavHost (see previous message)

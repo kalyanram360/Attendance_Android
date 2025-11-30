@@ -32,6 +32,8 @@ import java.net.URLEncoder
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
+import com.example.attendance_android.data.PresentDatabase
+import com.example.attendance_android.data.PresentEntity
 
 // ---------- Data classes ----------
 data class StudentPresent(val rollNo: String, val name: String)
@@ -89,6 +91,23 @@ fun StudentBleScreen(
 
                     // Compare token (exact match). Trim whitespace to be safe.
                     if (stringInAdv.trim() == tokenToMatch.trim() && !attendanceMarked) {
+                        // IMMEDIATELY mark as scanned to prevent duplicate processing
+                        attendanceMarked = true
+                        
+                        // Stop scanning IMMEDIATELY
+                        try {
+                            if (Build.VERSION.SDK_INT >= 31) {
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                                    scanner?.stopScan(scanCallback)
+                                }
+                            } else {
+                                scanner?.stopScan(scanCallback)
+                            }
+                            scanning = false
+                        } catch (e: Exception) {
+                            Log.e(tag, "Error stopping scan", e)
+                        }
+
                         // matched — update UI and call backend to mark attendance
                         advFoundText = "Found teacher device! Marking attendance..."
 
@@ -100,7 +119,6 @@ fun StudentBleScreen(
                             )
 
                             if (response != null && response.success) {
-                                attendanceMarked = true
                                 advFoundText = "✓ Attendance marked successfully!"
 
                                 // Add to attended list from response
@@ -108,19 +126,22 @@ fun StudentBleScreen(
                                     attended.add(StudentPresent(student.rollNo, student.name))
                                 }
 
-                                // Stop scanning after successful mark
-                                try {
-                                    // Check BLUETOOTH_CONNECT permission before stopping scan
-                                    if (Build.VERSION.SDK_INT >= 31) {
-                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                                            scanner?.stopScan(scanCallback)
+                                // Save attendance record to PresentDatabase
+                                scope.launch {
+                                    try {
+                                        withContext(Dispatchers.IO) {
+                                            val db = PresentDatabase.getInstance(context)
+                                            val presentEntity = PresentEntity(
+                                                subject = response.studentData?.name ?: "Unknown",
+                                                teacher = response.studentData?.rollNo ?: "Unknown",
+                                                createdAt = System.currentTimeMillis()
+                                            )
+                                            db.presentDao().insert(presentEntity)
+                                            Log.d(tag, "Attendance record saved to local DB")
                                         }
-                                    } else {
-                                        scanner?.stopScan(scanCallback)
+                                    } catch (e: Exception) {
+                                        Log.e(tag, "Failed to save attendance to local DB: ${e.message}")
                                     }
-                                    scanning = false
-                                } catch (e: Exception) {
-                                    Log.e(tag, "Error stopping scan", e)
                                 }
                             } else {
                                 scanError = response?.message ?: "Failed to mark attendance"
