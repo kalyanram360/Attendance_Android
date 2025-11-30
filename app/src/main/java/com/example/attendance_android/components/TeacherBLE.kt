@@ -20,6 +20,9 @@ import androidx.datastore.dataStore
 import androidx.compose.ui.platform.LocalContext
 import com.example.attendance_android.data.DataStoreManager
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.collectAsState
 /**
  * Teacher Home screen: select Year, Branch, Section and Start Class
  *
@@ -292,4 +295,11 @@ fun TeacherBLE(
             }
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun TeacherBLEPreview() {
+    val navController = androidx.navigation.compose.rememberNavController()
+    TeacherBLE(navController = navController)
 }

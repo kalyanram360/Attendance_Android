@@ -21,7 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.attendance_android.NavRoutes
-
+import androidx.compose.ui.tooling.preview.Preview
 @Composable
 fun TeacherHomeScreen(
     navController: NavController,
@@ -143,4 +143,15 @@ fun TeacherHomeScreen(
             }
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun TeacherHomeScreenPreview() {
+    val navController = androidx.navigation.compose.rememberNavController()
+    TeacherHomeScreen(
+        navController = navController,
+        fullname = "Dr. Sharma",
+        collegeName = "GVPCE"
+    )
 }

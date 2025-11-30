@@ -46,6 +46,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
 import kotlinx.coroutines.withContext
 
@@ -726,4 +727,10 @@ fun CompletionPage(onClose: () -> Unit) {
             Text("Continue")
         }
     }
+}
+
+@Preview
+@Composable
+fun CompletionPagePreview() {
+    CompletionPage { }
 }

@@ -34,7 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
 import com.example.attendance_android.data.PresentDatabase
 import com.example.attendance_android.data.PresentEntity
-
+import androidx.compose.ui.tooling.preview.Preview
 // ---------- Data classes ----------
 data class StudentPresent(val rollNo: String, val name: String)
 
@@ -399,4 +399,14 @@ suspend fun markAttendance(
         Log.e("markAttendance", "Error", e)
         return@withContext AttendanceResponse(false, "Network error: ${e.message}", null)
     }
+}
+
+@Composable
+@Preview(showBackground = true)
+fun StudentBleScreenPreview() {
+    StudentBleScreen(
+        navController = null,
+        tokenToMatch = "sample-token-123",
+        studentRollNo = "21A91A05"
+    )
 }

@@ -39,7 +39,7 @@ import androidx.navigation.NavHostController
 import com.example.attendance_android.data.ClassDatabase
 import com.example.attendance_android.data.ClassEntity
 import com.example.attendance_android.NavRoutes
-  
+import androidx.compose.ui.tooling.preview.Preview
 
 // Simple data class for attended student list (dummy)
 data class AttendedStudent(val rollNo: String, val name: String)
@@ -704,5 +704,18 @@ fun romanToInt(roman: String): Int {
             0
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AdvertisingScreenPreview() {
+    AdvertisingScreen(
+        navController = null,
+        year = "I",
+        branch = "CSE",
+        section = "A",
+        Subject = "Data Structures",
+        teacherEmail = "teacher@gvpce.ac.in"
+    )
 }
 
