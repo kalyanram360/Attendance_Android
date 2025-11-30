@@ -78,6 +78,8 @@ dependencies {
     // Room components
     implementation("androidx.room:room-runtime:2.5.2")
     implementation("androidx.room:room-ktx:2.5.2")
+    implementation ("androidx.compose.material:material-icons-extended")
+
     // Use explicit add(...) to avoid unresolved kapt(...) helper in some Gradle Kotlin DSL environments
     add("kapt", "androidx.room:room-compiler:2.5.2")
 

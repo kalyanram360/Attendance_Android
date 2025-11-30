@@ -40,7 +40,24 @@ import com.example.attendance_android.data.ClassDatabase
 import com.example.attendance_android.data.ClassEntity
 import com.example.attendance_android.NavRoutes
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.*
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 // Simple data class for attended student list (dummy)
 data class AttendedStudent(val rollNo: String, val name: String)
 
@@ -388,12 +405,25 @@ fun AdvertisingScreen(
     }
 
     // UI layout
+    val outerPulse by pulseAnim.animateFloat(
+        initialValue = 0.9f,
+        targetValue = 1.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "outerPulse"
+    )
+
     Scaffold(
         topBar = {
-            HeaderWithProfile(fullname = teacherEmail.split("@").firstOrNull() ?: "T", collegeName = "GVPCE", navController = navController)
+            HeaderWithProfile(
+                fullname = teacherEmail.split("@").firstOrNull() ?: "T",
+                collegeName = "GVPCE",
+                navController = navController
+            )
         }
     ) { innerPadding ->
-        // When the composable enters composition, ensure a token exists in backend (create once)
         LaunchedEffect(Unit) {
             if (token == null) {
                 posting = true
@@ -406,7 +436,6 @@ fun AdvertisingScreen(
                 }
             }
 
-            // Start polling present students every 5 seconds while composable is active
             while (true) {
                 val curToken = token
                 if (!curToken.isNullOrBlank()) {
@@ -417,262 +446,565 @@ fun AdvertisingScreen(
                 kotlinx.coroutines.delay(5000)
             }
         }
-                // state to hold full class details for editing/archiving after stop
-                var classDetails by remember { mutableStateOf<List<ClassBranch>?>(null) }
-                var classStopped by remember { mutableStateOf(false) }
-                // editable present map: rollNo -> present
-                val presentMap = remember { mutableStateMapOf<String, Boolean>() }
-        Column(
+
+        var classDetails by remember { mutableStateOf<List<ClassBranch>?>(null) }
+        var classStopped by remember { mutableStateOf(false) }
+        val presentMap = remember { mutableStateMapOf<String, Boolean>() }
+// compute once in composable scope (above LazyColumn)
+        val yearInt = romanToInt(year)
+
+        val studentsForSection = remember(classDetails, branch, section) {
+            classDetails
+                ?.firstOrNull { it.branchName.equals(branch, true) }
+                ?.sections
+                ?.firstOrNull { it.sectionName.equals(section, true) || it.year == yearInt }
+                ?.students
+                ?: emptyList()
+        }
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Advertising Class", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Show selected class details
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Year: $year • Branch: $branch • Section: $section")
-                    Text("Teacher: $teacherEmail", style = MaterialTheme.typography.bodySmall)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Advertising status & animation
-            Box(modifier = Modifier
-                .size(120.dp)
-                .background(Color.Transparent),
-                contentAlignment = Alignment.Center
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                contentPadding = PaddingValues(vertical = 20.dp)
             ) {
-                // pulsing circle
-                Box(
-                    modifier = Modifier
-                        .size((80 * pulse).dp)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), shape = androidx.compose.foundation.shape.CircleShape)
-                )
-                if (advertising) {
-                    Text("Advertising...", style = MaterialTheme.typography.bodyLarge)
-                } else {
-                    Text("Not Advertising", style = MaterialTheme.typography.bodyLarge)
+                // Header Section
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Class Session",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Token display and actions
-            token?.let {
-                Text(text = "Token: $it", style = MaterialTheme.typography.bodyMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            if (postingError != null) {
-                Text("Post error: $postingError", color = MaterialTheme.colorScheme.error)
-            }
-            if (advError != null) {
-                Text("Advertise error: $advError", color = MaterialTheme.colorScheme.error)
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            if (!hasBluetoothAdvertisePermission()) {
-                                advError = "Missing BLUETOOTH_ADVERTISE/CONNECT permission (Android 12+). Request runtime permissions."
-                                return@launch
+                // Class Info Card
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                InfoChip(label = "Year", value = year)
+                                InfoChip(label = "Branch", value = branch)
+                                InfoChip(label = "Section", value = section)
                             }
 
-                            val curToken = token
-                            if (curToken.isNullOrBlank()) {
-                                postingError = "Token not ready yet. Try again in a moment."
-                                return@launch
+                            Divider(
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
+                                thickness = 1.dp
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Class,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = Subject,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
                             }
 
-                            advError = null
-                            // start advertising using the existing token (do not create a new DB instance)
-                            val started = startBleAdvertising(curToken)
-                            advertising = started
-                            if (!started) advError = advError ?: "Failed to start advertising"
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Person,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = teacherEmail,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                )
+                            }
                         }
-                    },
-                    enabled = !advertising && !posting
-                ) {
-                    Text("Start Advertising")
+                    }
                 }
 
-                Button(
-                    onClick = {
-                        // Stop advertising and fetch class details for editing
-                        stopAdvertising()
-                        classStopped = true
-                        // fetch class full details and populate presentMap
-                        scope.launch {
-                            val curToken = token
-                            if (!curToken.isNullOrBlank()) {
-                                val details = fetchFullClassDetails(curToken)
-                                classDetails = details
-                                presentMap.clear()
-                                // populate presentMap for selected branch/section only
-                                details.forEach { b ->
-                                    if (b.branchName.equals(branch, true)) {
-                                        b.sections.forEach { s ->
-                                            if (s.sectionName.equals(section, true) || s.year == romanToInt(year)) {
-                                                s.students.forEach { st -> presentMap[st.rollNo] = st.present }
+                // Advertising Status Card
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (advertising)
+                                MaterialTheme.colorScheme.tertiaryContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            // Pulsing Animation
+                            Box(
+                                modifier = Modifier.size(160.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // Outer pulse
+                                if (advertising) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size((140 * outerPulse).dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                                shape = CircleShape
+                                            )
+                                    )
+                                }
+
+                                // Middle pulse
+                                Box(
+                                    modifier = Modifier
+                                        .size((100 * pulse).dp)
+                                        .background(
+                                            if (advertising)
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                                            else
+                                                MaterialTheme.colorScheme.surfaceVariant,
+                                            shape = CircleShape
+                                        )
+                                )
+
+                                // Center icon
+                                Box(
+                                    modifier = Modifier
+                                        .size(80.dp)
+                                        .background(
+                                            if (advertising)
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                            shape = CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (advertising) Icons.Outlined.Wifi else Icons.Outlined.WifiOff,
+                                        contentDescription = null,
+                                        tint = if (advertising) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                }
+                            }
+
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = if (advertising) "Broadcasting Active" else "Ready to Start",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (advertising)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                token?.let {
+                                    Surface(
+                                        shape = MaterialTheme.shapes.medium,
+                                        color = MaterialTheme.colorScheme.surface,
+                                        modifier = Modifier.padding(top = 8.dp)
+                                    ) {
+                                        Text(
+                                            text = "Token: $it",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Error Messages
+                if (postingError != null || advError != null) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            shape = MaterialTheme.shapes.large
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                if (postingError != null) {
+                                    Text(
+                                        text = "⚠️ $postingError",
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                if (advError != null) {
+                                    Text(
+                                        text = "⚠️ $advError",
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Control Buttons
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    if (!hasBluetoothAdvertisePermission()) {
+                                        advError = "Missing BLUETOOTH permissions"
+                                        return@launch
+                                    }
+
+                                    val curToken = token
+                                    if (curToken.isNullOrBlank()) {
+                                        postingError = "Token not ready"
+                                        return@launch
+                                    }
+
+                                    advError = null
+                                    val started = startBleAdvertising(curToken)
+                                    advertising = started
+                                    if (!started) advError = advError ?: "Failed to start"
+                                }
+                            },
+                            enabled = !advertising && !posting,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            shape = MaterialTheme.shapes.large
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Start", style = MaterialTheme.typography.titleMedium)
+                        }
+
+                        Button(
+                            onClick = {
+                                stopAdvertising()
+                                classStopped = true
+                                scope.launch {
+                                    val curToken = token
+                                    if (!curToken.isNullOrBlank()) {
+                                        val details = fetchFullClassDetails(curToken)
+                                        classDetails = details
+                                        presentMap.clear()
+                                        details.forEach { b ->
+                                            if (b.branchName.equals(branch, true)) {
+                                                b.sections.forEach { s ->
+                                                    if (s.sectionName.equals(section, true) || s.year == romanToInt(year)) {
+                                                        s.students.forEach { st -> presentMap[st.rollNo] = st.present }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
-                        }
-                    },
-                    enabled = advertising
-                ) {
-                    Text("Stop")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            if (!classStopped) {
-                // show real-time attended students while advertising (read-only)
-                Text("Attended students", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(8.dp))
-
-                LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    items(attended) { s ->
-                        Card(modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)) {
-                            Row(modifier = Modifier
-                                .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(s.name, fontWeight = FontWeight.SemiBold)
-                                    Text(s.rollNo, style = MaterialTheme.typography.bodySmall)
-                                }
-                                Text("Present", color = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-            } else {
-                // Class stopped: show editable checklist for selected branch/section
-                Text("Edit attendance before archiving", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // find students for given branch+section
-                val studentsForSection = remember(classDetails, branch, section) {
-                    classDetails?.firstOrNull { it.branchName.equals(branch, true) }?.sections
-                        ?.firstOrNull { it.sectionName.equals(section, true) || it.year == romanToInt(year) }
-                        ?.students ?: emptyList()
-                }
-
-                LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    items(studentsForSection) { st ->
-                        val checked = presentMap[st.rollNo] ?: false
-                        Row(modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = checked, onCheckedChange = { v -> presentMap[st.rollNo] = v })
+                            },
+                            enabled = advertising,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            shape = MaterialTheme.shapes.large,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Stop,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
                             Spacer(Modifier.width(8.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(st.name, fontWeight = FontWeight.SemiBold)
-                                Text(st.rollNo, style = MaterialTheme.typography.bodySmall)
-                            }
+                            Text("Stop", style = MaterialTheme.typography.titleMedium)
                         }
                     }
                 }
 
-                Spacer(Modifier.height(12.dp))
-
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    Button(onClick = {
-                        // submit modified class object to archive route
-                        scope.launch {
-                            val curToken = token ?: return@launch
-
-                            // Build classObject JSON from classDetails, but update present flags from presentMap
-                            val classJson = JSONObject()
-                            classJson.put("token", curToken)
-                            val teacherObj = JSONObject()
-                            teacherObj.put("name", teacherEmail.split("@").firstOrNull() ?: "Teacher")
-                            teacherObj.put("email", teacherEmail)
-                            classJson.put("teacher", teacherObj)
-                            classJson.put("subject", Subject)
-
-                            val branchesJson = org.json.JSONArray()
-                            classDetails?.forEach { b ->
-                                val bObj = JSONObject()
-                                bObj.put("branchName", b.branchName)
-                                val secs = org.json.JSONArray()
-                                b.sections.forEach { s ->
-                                    val sObj = JSONObject()
-                                    sObj.put("sectionName", s.sectionName)
-                                    sObj.put("year", s.year)
-                                    val studs = org.json.JSONArray()
-                                    s.students.forEach { st ->
-                                        val stuObj = JSONObject()
-                                        stuObj.put("rollNo", st.rollNo)
-                                        stuObj.put("name", st.name)
-                                        stuObj.put("present", presentMap[st.rollNo] ?: st.present)
-                                        studs.put(stuObj)
-                                    }
-                                    sObj.put("students", studs)
-                                    secs.put(sObj)
+                // Attendance Section
+                if (!classStopped) {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Present Students",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Text(
+                                        text = "${attended.size}",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
                                 }
-                                bObj.put("sections", secs)
-                                branchesJson.put(bObj)
                             }
-                            classJson.put("branches", branchesJson)
-                            val (ok, err) = archiveClassOnServer(classJson)
-                            if (ok) {
-                                // archived successfully; persist a lightweight record in Room and navigate back to teacher home
-                                postingError = null
-                                advError = null
-                                // persist token, subject and timestamp into Room DB
-                                try {
-                                    withContext(Dispatchers.IO) {
-                                        val db = ClassDatabase.getInstance(context)
-                                        db.classDao().insert(
-                                            ClassEntity(
-                                                token = curToken,
-                                                subject = Subject,
-                                                createdAt = System.currentTimeMillis()
-                                            )
+                        }
+                    }
+
+                    if (attended.isEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                ),
+                                shape = MaterialTheme.shapes.large
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.People,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                        Text(
+                                            text = "Waiting for students...",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                } catch (e: Exception) {
-                                    Log.e(tag, "Failed to save archived class to DB: ${e.message}")
                                 }
-
-                                navController?.navigate(NavRoutes.TeacherHome.route) {
-                                    popUpTo(0)
-                                }
-                            } else {
-                                postingError = err ?: "Failed to archive class"
                             }
                         }
-                    }) {
-                        Text("Submit & Archive")
+                    } else {
+                        items(attended) { student ->
+                            AttendanceCard(student = student)
+                        }
+                    }
+                } else {
+                    // Edit Mode
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            ),
+                            shape = MaterialTheme.shapes.large
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Edit,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Review Attendance",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                    Text(
+                                        text = "Make final adjustments before archiving",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
+                        }
                     }
 
-                    Button(onClick = {
-                        // Cancel editing and resume advertising (if desired)
-                        classStopped = false
-                    }) {
-                        Text("Cancel")
+
+                    items(studentsForSection) { student ->
+                        EditableAttendanceCard(
+                            student = student,
+                            checked = presentMap[student.rollNo] ?: false,
+                            onCheckedChange = { presentMap[student.rollNo] = it }
+                        )
+                    }
+
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            FilledTonalButton(
+                                onClick = {
+                                    classStopped = false
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(56.dp),
+                                shape = MaterialTheme.shapes.large
+                            ) {
+                                Icon(Icons.Outlined.Close, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Cancel")
+                            }
+
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        val curToken = token ?: return@launch
+
+                                        val classJson = JSONObject()
+                                        classJson.put("token", curToken)
+                                        val teacherObj = JSONObject()
+                                        teacherObj.put("name", teacherEmail.split("@").firstOrNull() ?: "Teacher")
+                                        teacherObj.put("email", teacherEmail)
+                                        classJson.put("teacher", teacherObj)
+                                        classJson.put("subject", Subject)
+
+                                        val branchesJson = org.json.JSONArray()
+                                        classDetails?.forEach { b ->
+                                            val bObj = JSONObject()
+                                            bObj.put("branchName", b.branchName)
+                                            val secs = org.json.JSONArray()
+                                            b.sections.forEach { s ->
+                                                val sObj = JSONObject()
+                                                sObj.put("sectionName", s.sectionName)
+                                                sObj.put("year", s.year)
+                                                val studs = org.json.JSONArray()
+                                                s.students.forEach { st ->
+                                                    val stuObj = JSONObject()
+                                                    stuObj.put("rollNo", st.rollNo)
+                                                    stuObj.put("name", st.name)
+                                                    stuObj.put("present", presentMap[st.rollNo] ?: st.present)
+                                                    studs.put(stuObj)
+                                                }
+                                                sObj.put("students", studs)
+                                                secs.put(sObj)
+                                            }
+                                            bObj.put("sections", secs)
+                                            branchesJson.put(bObj)
+                                        }
+                                        classJson.put("branches", branchesJson)
+
+                                        val (ok, err) = archiveClassOnServer(classJson)
+                                        if (ok) {
+                                            postingError = null
+                                            advError = null
+                                            try {
+                                                withContext(Dispatchers.IO) {
+                                                    val db = ClassDatabase.getInstance(context)
+                                                    db.classDao().insert(
+                                                        ClassEntity(
+                                                            token = curToken,
+                                                            subject = Subject,
+                                                            createdAt = System.currentTimeMillis()
+                                                        )
+                                                    )
+                                                }
+                                            } catch (e: Exception) {
+                                                Log.e(tag, "Failed to save: ${e.message}")
+                                            }
+
+                                            navController?.navigate(NavRoutes.TeacherHome.route) {
+                                                popUpTo(0)
+                                            }
+                                        } else {
+                                            postingError = err ?: "Failed to archive"
+                                        }
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(56.dp),
+                                shape = MaterialTheme.shapes.large
+                            ) {
+                                Icon(Icons.Outlined.Archive, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Archive")
+                            }
+                        }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+
+                // Bottom spacer
+                item {
+                    Spacer(Modifier.height(20.dp))
+                }
             }
-        } // Column
-    } // Scaffold
+        }
+    }
 
     // Clean up advertising when composable leaves the composition
     DisposableEffect(Unit) {
@@ -685,6 +1017,7 @@ fun AdvertisingScreen(
         }
     }
 }
+
 fun romanToInt(roman: String): Int {
     return when (roman.uppercase().trim()) {
         "I" -> {
@@ -706,6 +1039,159 @@ fun romanToInt(roman: String): Int {
     }
 }
 
+
+@Composable
+fun InfoChip(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+    }
+}
+
+@Composable
+fun AttendanceCard(student: AttendedStudent) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Person,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = student.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = student.rollNo,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun EditableAttendanceCard(
+    student: ClassStudent,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = if (checked)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            else
+                MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = MaterialTheme.colorScheme.primary
+                )
+            )
+
+            Spacer(Modifier.width(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        if (checked)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Person,
+                    contentDescription = null,
+                    tint = if (checked)
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = student.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (checked)
+                        MaterialTheme.colorScheme.onSurface
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = student.rollNo,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
 @Preview(showBackground = true)
 @Composable
 fun AdvertisingScreenPreview() {
