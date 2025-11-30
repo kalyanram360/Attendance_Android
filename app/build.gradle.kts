@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    kotlin("kapt")
 }
 
 android {
@@ -73,5 +74,11 @@ dependencies {
     implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
     // okhttp is optional (I used HttpURLConnection in the example). If you prefer okhttp:
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
+
+    // Room components
+    implementation("androidx.room:room-runtime:2.5.2")
+    implementation("androidx.room:room-ktx:2.5.2")
+    // Use explicit add(...) to avoid unresolved kapt(...) helper in some Gradle Kotlin DSL environments
+    add("kapt", "androidx.room:room-compiler:2.5.2")
 
 }

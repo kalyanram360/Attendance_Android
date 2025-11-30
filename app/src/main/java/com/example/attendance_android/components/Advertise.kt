@@ -36,6 +36,8 @@ import android.content.pm.PackageManager
 
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
+import com.example.attendance_android.data.ClassDatabase
+import com.example.attendance_android.data.ClassEntity
 import com.example.attendance_android.NavRoutes
   
 
@@ -630,9 +632,25 @@ fun AdvertisingScreen(
                             classJson.put("branches", branchesJson)
                             val (ok, err) = archiveClassOnServer(classJson)
                             if (ok) {
-                                // archived successfully; navigate back to teacher home
+                                // archived successfully; persist a lightweight record in Room and navigate back to teacher home
                                 postingError = null
                                 advError = null
+                                // persist token, subject and timestamp into Room DB
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        val db = ClassDatabase.getInstance(context)
+                                        db.classDao().insert(
+                                            ClassEntity(
+                                                token = curToken,
+                                                subject = Subject,
+                                                createdAt = System.currentTimeMillis()
+                                            )
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(tag, "Failed to save archived class to DB: ${e.message}")
+                                }
+
                                 navController?.navigate(NavRoutes.TeacherHome.route) {
                                     popUpTo(0)
                                 }
