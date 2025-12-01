@@ -14,10 +14,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -30,11 +35,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import androidx.core.content.ContextCompat
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.attendance_android.data.PresentDatabase
 import com.example.attendance_android.data.PresentEntity
 import androidx.compose.ui.tooling.preview.Preview
+
 // ---------- Data classes ----------
 data class StudentPresent(val rollNo: String, val name: String)
 
@@ -43,8 +49,8 @@ data class StudentPresent(val rollNo: String, val name: String)
 @Composable
 fun StudentBleScreen(
     navController: NavController? = null,
-    tokenToMatch: String,                     // token obtained from current class
-    studentRollNo: String,                    // student's roll number (from DataStore/login)
+    tokenToMatch: String,
+    studentRollNo: String,
     backendBaseUrl: String = "https://attendance-app-backend-zr4c.onrender.com"
 ) {
     val context = LocalContext.current
@@ -61,40 +67,45 @@ fun StudentBleScreen(
     var advFoundText by remember { mutableStateOf<String?>(null) }
     var attendanceMarked by remember { mutableStateOf(false) }
 
-    // list of attended students (you can populate this from backend response)
     val attended = remember { mutableStateListOf<StudentPresent>() }
 
-    // pulsing animation
-    val infinite = rememberInfiniteTransition()
+    // Enhanced animations
+    val infinite = rememberInfiniteTransition(label = "pulse")
     val pulse by infinite.animateFloat(
-        initialValue = 0.7f,
+        initialValue = 0.85f,
         targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse)
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
     )
 
-    // Define the service UUID used by teacher advertising (must match teacher's UUID)
-    val serviceUuid = ParcelUuid.fromString("0000feed-0000-1000-8000-00805f9b34fb")
+    val rotation by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
 
-    // Mutable reference to the scan callback (allows self-reference inside the callback)
+    val serviceUuid = ParcelUuid.fromString("0000feed-0000-1000-8000-00805f9b34fb")
     var scanCallback: ScanCallback? = null
 
-    // Build a ScanCallback that checks service data for the token
     scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             try {
                 val record = result.scanRecord ?: return
-                // get service data for the UUID
                 val data = record.getServiceData(serviceUuid)
                 if (data != null) {
                     val stringInAdv = String(data, Charsets.UTF_8)
                     Log.d(tag, "adv serviceData: $stringInAdv from ${result.device.address}")
 
-                    // Compare token (exact match). Trim whitespace to be safe.
                     if (stringInAdv.trim() == tokenToMatch.trim() && !attendanceMarked) {
-                        // IMMEDIATELY mark as scanned to prevent duplicate processing
                         attendanceMarked = true
-                        
-                        // Stop scanning IMMEDIATELY
+
                         try {
                             if (Build.VERSION.SDK_INT >= 31) {
                                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
@@ -108,7 +119,6 @@ fun StudentBleScreen(
                             Log.e(tag, "Error stopping scan", e)
                         }
 
-                        // matched — update UI and call backend to mark attendance
                         advFoundText = "Found teacher device! Marking attendance..."
 
                         scope.launch {
@@ -121,12 +131,10 @@ fun StudentBleScreen(
                             if (response != null && response.success) {
                                 advFoundText = "✓ Attendance marked successfully!"
 
-                                // Add to attended list from response
                                 response.studentData?.let { student ->
                                     attended.add(StudentPresent(student.rollNo, student.name))
                                 }
 
-                                // Save attendance record to PresentDatabase
                                 scope.launch {
                                     try {
                                         withContext(Dispatchers.IO) {
@@ -161,7 +169,6 @@ fun StudentBleScreen(
         }
     }
 
-    // Permission check helper
     fun hasScanPermissions(ctx: Context): Boolean {
         val api31 = Build.VERSION.SDK_INT >= 31
         return if (api31) {
@@ -169,12 +176,10 @@ fun StudentBleScreen(
             val conn = ContextCompat.checkSelfPermission(ctx, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
             adv && conn
         } else {
-            // pre-31 some devices need location permission to scan
             ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         }
     }
 
-    // Start scanning function
     fun startScan() {
         if (scanner == null) {
             scanError = "Bluetooth LE scanner not available"
@@ -211,10 +216,8 @@ fun StudentBleScreen(
         }
     }
 
-    // Stop scanning
     fun stopScan() {
         try {
-            // Check BLUETOOTH_CONNECT permission before stopping scan
             if (Build.VERSION.SDK_INT >= 31) {
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
                     scanner?.stopScan(scanCallback)
@@ -231,7 +234,6 @@ fun StudentBleScreen(
         }
     }
 
-    // Clean up when composable leaves composition
     DisposableEffect(Unit) {
         onDispose {
             stopScan()
@@ -252,73 +254,368 @@ fun StudentBleScreen(
             )
         }
     ) { innerPadding ->
-        Column(
-            Modifier
+        Box(
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("Scan to mark attendance", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
-
-            // pulsing circle
-            Box(
-                modifier = Modifier
-                    .size((90 * pulse).dp)
-                    .background(
-                        if (attendanceMarked)
-                            Color.Green.copy(alpha = 0.15f)
-                        else
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    if (attendanceMarked) "Marked!"
-                    else if (scanning) "Scanning..."
-                    else "Not scanning",
-                    style = MaterialTheme.typography.bodyLarge
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.surface,
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        )
+                    )
                 )
-            }
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                contentPadding = PaddingValues(16.dp)
+            ) {
+                item {
+                    Spacer(Modifier.height(8.dp))
 
-            Spacer(Modifier.height(12.dp))
-
-            if (!hasScanPermissions(context)) {
-                Text("BLE scan permission missing — request runtime permissions.", color = Color.Red)
-            }
-
-            scanError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            advFoundText?.let { Text(it, color = if (attendanceMarked) Color.Green else MaterialTheme.colorScheme.primary) }
-
-            Spacer(Modifier.height(12.dp))
-
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Button(onClick = { startScan() }, enabled = !scanning && !attendanceMarked) {
-                    Text(if (attendanceMarked) "Already Marked" else "Start Scanning")
-                }
-                Button(onClick = { stopScan() }, enabled = scanning) { Text("Stop") }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            if (attended.isNotEmpty()) {
-                Text("Marked Present", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(8.dp))
-
-                LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    items(attended) { s ->
-                        Card(modifier = Modifier
+                    // Header Card
+                    Card(
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp)
+                            .padding(bottom = 24.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(s.name, fontWeight = FontWeight.SemiBold)
-                                    Text(s.rollNo, style = MaterialTheme.typography.bodySmall)
+                            Icon(
+                                imageVector = Icons.Default.Bluetooth,
+                                contentDescription = null,
+                                modifier = Modifier.size(32.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Mark Your Attendance",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Scan to find nearby teacher device",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+
+                    // Scanning Status Card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 20.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Animated scanning indicator
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(vertical = 16.dp)
+                            ) {
+                                // Outer pulsing ring
+                                Box(
+                                    modifier = Modifier
+                                        .size((140 * pulse).dp)
+                                        .background(
+                                            when {
+                                                attendanceMarked -> Color(0xFF4CAF50).copy(alpha = 0.1f)
+                                                scanning -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                                else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
+                                            },
+                                            shape = CircleShape
+                                        )
+                                )
+
+                                // Middle ring
+                                Box(
+                                    modifier = Modifier
+                                        .size(100.dp)
+                                        .background(
+                                            when {
+                                                attendanceMarked -> Color(0xFF4CAF50).copy(alpha = 0.2f)
+                                                scanning -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                                else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                                            },
+                                            shape = CircleShape
+                                        )
+                                )
+
+                                // Inner circle with icon
+                                Surface(
+                                    modifier = Modifier.size(70.dp),
+                                    shape = CircleShape,
+                                    color = when {
+                                        attendanceMarked -> Color(0xFF4CAF50)
+                                        scanning -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.surfaceVariant
+                                    },
+                                    shadowElevation = 8.dp
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = when {
+                                                attendanceMarked -> Icons.Default.CheckCircle
+                                                scanning -> Icons.Default.Bluetooth
+                                                else -> Icons.Default.BluetoothDisabled
+                                            },
+                                            contentDescription = null,
+                                            modifier = Modifier.size(36.dp),
+                                            tint = when {
+                                                attendanceMarked -> Color.White
+                                                scanning -> Color.White
+                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
+                                        )
+                                    }
                                 }
-                                Text("Present", color = Color.Green, fontWeight = FontWeight.Bold)
+                            }
+
+                            Spacer(Modifier.height(16.dp))
+
+                            // Status text
+                            Text(
+                                text = when {
+                                    attendanceMarked -> "Attendance Marked!"
+                                    scanning -> "Scanning for devices..."
+                                    else -> "Ready to scan"
+                                },
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = when {
+                                    attendanceMarked -> Color(0xFF4CAF50)
+                                    scanning -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+
+                            // Permission warning
+                            if (!hasScanPermissions(context)) {
+                                Spacer(Modifier.height(16.dp))
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Warning,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            "BLE permissions required",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Error message
+                            scanError?.let { error ->
+                                Spacer(Modifier.height(12.dp))
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Error,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            error,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Success message
+                            advFoundText?.let { text ->
+                                Spacer(Modifier.height(12.dp))
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (attendanceMarked)
+                                            Color(0xFF4CAF50).copy(alpha = 0.1f)
+                                        else
+                                            MaterialTheme.colorScheme.primaryContainer
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            if (attendanceMarked) Icons.Default.CheckCircle else Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = if (attendanceMarked) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            text,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (attendanceMarked) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onPrimaryContainer,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(20.dp))
+
+                            // Action buttons
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                FilledTonalButton(
+                                    onClick = { startScan() },
+                                    enabled = !scanning && !attendanceMarked,
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(vertical = 16.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.BluetoothSearching,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        if (attendanceMarked) "Marked" else "Start Scan",
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+
+                                OutlinedButton(
+                                    onClick = { stopScan() },
+                                    enabled = scanning,
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(vertical = 16.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Stop,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Stop", fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
+
+                    // Attended students list
+                    if (attended.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Attendance Recorded",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                    }
+                }
+
+                items(attended) { student ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF4CAF50).copy(alpha = 0.05f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(48.dp),
+                                shape = CircleShape,
+                                color = Color(0xFF4CAF50).copy(alpha = 0.15f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = Color(0xFF4CAF50),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.width(16.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    student.name,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    student.rollNo,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF4CAF50)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        "Present",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
@@ -351,7 +648,6 @@ suspend fun markAttendance(
     studentRoll: String
 ): AttendanceResponse? = withContext(Dispatchers.IO) {
     try {
-        // URL encode the roll number to handle special characters
         val encodedRoll = URLEncoder.encode(studentRoll, "UTF-8")
         val urlString = "$backendBaseUrl/api/class/mark/$token/$encodedRoll"
 
@@ -376,7 +672,6 @@ suspend fun markAttendance(
 
         Log.d("markAttendance", "Response code=$code text=$text")
 
-        // Parse the response
         val json = JSONObject(text)
         val success = json.optBoolean("success", false)
         val message = json.optString("message", "Unknown error")

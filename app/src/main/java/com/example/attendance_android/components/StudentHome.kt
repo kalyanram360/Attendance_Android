@@ -1,18 +1,26 @@
 package com.example.attendance_android.components
 
-// --- imports ---
 import android.util.Log
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -21,30 +29,26 @@ import com.example.attendance_android.data.DataStoreManager
 import com.example.attendance_android.data.PresentDatabase
 import com.example.attendance_android.data.PresentEntity
 import com.example.attendance_android.ui.theme.Attendance_AndroidTheme
-import com.example.attendance_android.ui.theme.StatusMissed
-import com.example.attendance_android.ui.theme.StatusPresent
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.*
 
-// --- data model ---
 data class ClassItem(
     val id: Int,
     val subject: String,
     val teacher: String,
-    val time: String,        // e.g., token or "10:00 - 10:50"
-    val date: String,        // e.g., "dd MMM yyyy, HH:mm"
+    val time: String,
+    val date: String,
     val attended: Boolean
 )
 
@@ -53,52 +57,37 @@ private const val TAG = "StudentHome"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudentScreenContent(
-    navController: NavController? = null,                           // optional navController
+    navController: NavController? = null,
     currentClass: ClassItem? = null,
     previousClasses: List<ClassItem> = emptyList(),
-    onMarkAttendance: (ClassItem) -> Unit = {}                     // callback for button
+    onMarkAttendance: (ClassItem) -> Unit = {}
 ) {
     val context = LocalContext.current
     val dataStore = remember { DataStoreManager(context) }
 
-    // DataStore-backed values (strings)
     val branch by dataStore.branch.collectAsState(initial = "")
     val section by dataStore.section.collectAsState(initial = "")
     val yearStr by dataStore.year.collectAsState(initial = "")
     val studentRoll by dataStore.rollNumber.collectAsState(initial = "")
 
-    // backend base URL (adjust if needed)
     val backendurl = "https://attendance-app-backend-zr4c.onrender.com"
 
-    // UI state
     var fetchedCurrentClass by remember { mutableStateOf<ClassItem?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var lastError by remember { mutableStateOf<String?>(null) }
 
-    // Debug: show DataStore values in logs
-    LaunchedEffect(branch, section, yearStr) {
-        Log.d(TAG, "DataStore values changed: branch='$branch' section='$section' year='$yearStr'")
-    }
-
-    // Helper: safe year parse
     fun safeYear(s: String): Int? = try { s.toInt() } catch (e: Exception) { null }
 
-    // Fetch when inputs are ready
     LaunchedEffect(branch, section, yearStr) {
-        Log.d(TAG, "LaunchedEffect triggered for fetching class: branch='$branch' section='$section' year='$yearStr'")
-
-        // Reset states
         lastError = null
         fetchedCurrentClass = null
 
         if (branch.isBlank() || section.isBlank() || yearStr.isBlank()) {
-            Log.d(TAG, "Skipping fetch - missing branch/section/year")
             return@LaunchedEffect
         }
 
         val year = safeYear(yearStr)
         if (year == null) {
-            Log.w(TAG, "Year parse failed for '$yearStr'")
             lastError = "Invalid year: $yearStr"
             return@LaunchedEffect
         }
@@ -107,217 +96,272 @@ fun StudentScreenContent(
         try {
             val result = fetchCurrentClassForStudent(backendurl, branch, section, year)
             fetchedCurrentClass = result
-            Log.d(TAG, "fetchCurrentClassForStudent returned: $result")
         } catch (e: Exception) {
-            Log.e(TAG, "Exception while fetching current class: ${e.message}", e)
             lastError = e.message ?: "unknown error"
         } finally {
             isLoading = false
         }
     }
 
-    // Prepare "current" for UI: prefer fetched -> provided -> dummy
     val now = LocalDateTime.now()
     val formatter = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm")
-    val current = fetchedCurrentClass ?: currentClass ?: ClassItem(
-        id = 1,
-        subject = "Data Structures",
-        teacher = "Dr. Singh",
-        time = "10:00 - 10:50",
-        date = now.format(formatter),
-        attended = false
-    )
+    val current = fetchedCurrentClass ?: currentClass
 
-    val previous = previousClasses.ifEmpty {
-        remember {
-            List(8) { idx ->
-                ClassItem(
-                    id = idx + 2,
-                    subject = listOf("OS", "DBMS", "ML", "Networks", "Compiler", "SE")[idx % 6],
-                    teacher = listOf("Dr. Sharma", "Ms. Gupta", "Prof. Rao", "Mr. Das")[idx % 4],
-                    time = "09:00 - 09:50",
-                    date = now.minusDays((idx + 1).toLong()).format(formatter),
-                    attended = idx % 3 != 0
-                )
-            }
+    val attendedFromDb = remember { mutableStateListOf<PresentEntity>() }
+    LaunchedEffect(Unit) {
+        val dao = PresentDatabase.getInstance(context).presentDao()
+        dao.getAll().collect { list ->
+            attendedFromDb.clear()
+            attendedFromDb.addAll(list)
         }
     }
 
-    // --- UI ---
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Text(
-            text = "Current Class",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(Modifier.height(8.dp))
-
-        // Debug row (temporary) to verify DataStore values on screen
-        Text(
-            text = "DBG: branch='$branch' section='$section' year='$yearStr'",
-            style = MaterialTheme.typography.labelSmall
-        )
-        Spacer(Modifier.height(6.dp))
-
-        // Loading / error / no-class notices
-        when {
-            isLoading -> {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Checking for ongoing class...")
-                }
-                Spacer(Modifier.height(8.dp))
-            }
-            lastError != null -> {
-                Text("Error: $lastError", color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(8.dp))
-            }
-            fetchedCurrentClass == null && (branch.isNotBlank() && section.isNotBlank() && yearStr.isNotBlank()) -> {
-                Text("No ongoing class found for $branch $section (year $yearStr)")
-                Spacer(Modifier.height(8.dp))
-            }
-        }
-
-        // Card - show current info (either fetched or default)
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(140.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-        ) {
-            Row(
-                Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+        // Header Section
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(current.subject, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.height(4.dp))
-                    Text("Teacher: ${current.teacher}", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.height(6.dp))
-                    // If fetched class used token in time field, show token label; else show time
-                    if (fetchedCurrentClass != null) {
-                        Text("Started: ${current.date}", style = MaterialTheme.typography.bodySmall)
-                        Spacer(Modifier.height(2.dp))
-                        Text("Token: ${current.time}", style = MaterialTheme.typography.bodySmall)
-                    } else {
-                        Text("${current.date} • ${current.time}", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-
-                // Mark attendance button
-                Column(horizontalAlignment = Alignment.End) {
-                    Button(
-                        onClick = {
-                            val roll = studentRoll.ifBlank { "323103382034" }
-                            navController?.navigate("student_ble/${current.time}/${roll}")
-                        },
-                        modifier = Modifier
-                            .width(140.dp)
-                            .height(44.dp)
-                    ) {
-                        Text(if (current.attended) "Marked" else "Mark Attendance")
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    if (current.attended) {
-                        Text("Status: Present", style = MaterialTheme.typography.bodySmall, color = StatusPresent)
-                    } else {
-                        Text("Status: Not marked", style = MaterialTheme.typography.bodySmall, color = StatusMissed)
-                    }
-                }
+                Text(
+                    text = "Current Session",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Track your attendance in real-time",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
-        Spacer(Modifier.height(18.dp))
-
-        // Load attended classes from PresentDatabase
-        val attendedFromDb = remember { mutableStateListOf<PresentEntity>() }
-        LaunchedEffect(Unit) {
-            val dao = PresentDatabase.getInstance(context).presentDao()
-            dao.getAll().collect { list ->
-                attendedFromDb.clear()
-                attendedFromDb.addAll(list)
+        // Loading/Error States
+        if (isLoading) {
+            item {
+                LoadingCard()
             }
-        }
-
-        // Display Previous/Attended Classes
-        if (attendedFromDb.isEmpty()) {
-            Text(
-                text = "Previous Classes",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "No attended classes yet",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Attend classes to see your history here.",
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
+        } else if (lastError != null) {
+            item {
+                ErrorCard(message = lastError ?: "Unknown error")
+            }
+        } else if (current == null) {
+            item {
+                NoClassCard(branch = branch, section = section, year = yearStr)
             }
         } else {
-            Text(
-                text = "Previous Classes",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(8.dp))
+            // Current Class Card
+            item {
+                CurrentClassCard(
+                    classItem = current,
+                    isFetched = fetchedCurrentClass != null,
+                    onMarkAttendance = {
+                        val roll = studentRoll.ifBlank { "323103382034" }
+                        navController?.navigate("student_ble/${current.time}/${roll}")
+                    }
+                )
+            }
+        }
 
-            // List of attended classes from database
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+        // Stats Overview
+        item {
+            StatsCard(totalAttended = attendedFromDb.size)
+        }
+
+        // Previous Classes Section
+        item {
+            Text(
+                text = "Attendance History",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        if (attendedFromDb.isEmpty()) {
+            item {
+                EmptyHistoryCard()
+            }
+        } else {
+            items(attendedFromDb) { present ->
+                AttendanceHistoryCard(present = present)
+            }
+        }
+
+        // Bottom spacer
+        item {
+            Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+fun CurrentClassCard(
+    classItem: ClassItem,
+    isFetched: Boolean,
+    onMarkAttendance: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                            MaterialTheme.colorScheme.primary
+                        )
+                    )
+                )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(attendedFromDb) { present ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(72.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                // Subject and Teacher
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = classItem.subject,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = classItem.teacher,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+                        )
+                    }
+                }
+
+                Divider(
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
+
+                // Time and Token Info
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(present.subject, fontWeight = FontWeight.SemiBold)
-                                Spacer(Modifier.height(4.dp))
+                            Icon(
+                                imageVector = Icons.Outlined.Schedule,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = classItem.date,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                            )
+                        }
+
+                        if (isFetched) {
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
+                            ) {
                                 Text(
-                                    "Teacher: ${present.teacher ?: "Unknown"}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
-                                val dt = sdf.format(Date(present.createdAt))
-                                Text(
-                                    dt,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = "Token: ${classItem.time}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
-                            Text("Present", color = MaterialTheme.colorScheme.primary)
                         }
+                    }
+
+                    // Status Badge
+                    Surface(
+                        shape = CircleShape,
+                        color = if (classItem.attended)
+                            Color(0xFF4CAF50)
+                        else
+                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (classItem.attended) {
+                                Icon(
+                                    imageVector = Icons.Filled.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Text(
+                                text = if (classItem.attended) "Present" else "Not Marked",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (classItem.attended) Color.White else MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                }
+
+                // Mark Attendance Button
+                if (!classItem.attended) {
+                    Button(
+                        onClick = onMarkAttendance,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = MaterialTheme.shapes.large,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onPrimary,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Mark Attendance",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -325,11 +369,304 @@ fun StudentScreenContent(
     }
 }
 
-/**
- * Fetch current class for a branch/section/year.
- * Returns a ClassItem or null.
- * Adds detailed logging (Logcat).
- */
+@Composable
+fun LoadingCard() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(40.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "Checking for ongoing class...",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ErrorCard(message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+        }
+    }
+}
+
+@Composable
+fun NoClassCard(branch: String, section: String, year: String) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        )
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.EventBusy,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(56.dp)
+                )
+                Text(
+                    text = "No Ongoing Class",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (branch.isNotBlank() && section.isNotBlank()) {
+                    Text(
+                        text = "$branch • Section $section • Year $year",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StatsCard(totalAttended: Int) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CalendarMonth,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Column {
+                    Text(
+                        text = "Classes Attended",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = "$totalAttended",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyHistoryCard() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        )
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.History,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(48.dp)
+                )
+                Text(
+                    text = "No attendance history",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Your attended classes will appear here",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AttendanceHistoryCard(present: PresentEntity) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Icon
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Class,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            // Content
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = present.subject,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = present.teacher ?: "Unknown",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                val sdf = SimpleDateFormat("dd MMM yyyy • HH:mm", Locale.getDefault())
+                val dt = sdf.format(Date(present.createdAt))
+                Text(
+                    text = dt,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+
+            // Status Badge
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFF4CAF50).copy(alpha = 0.15f)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+// Keep your existing fetch function
 suspend fun fetchCurrentClassForStudent(
     backendBaseUrl: String,
     branch: String,
@@ -366,7 +703,6 @@ suspend fun fetchCurrentClassForStudent(
                 return@withContext null
             }
 
-            // teacher name
             val teacherName = data.optJSONObject("teacher")?.optString("name", "Unknown Teacher") ?: "Unknown Teacher"
             val token = data.optString("token", "")
             val createdAtIso = data.optString("createdAt", null)
@@ -386,7 +722,6 @@ suspend fun fetchCurrentClassForStudent(
                 LocalDateTime.now().format(fmt)
             }
 
-            // Confirm section exists in returned object (defensive)
             var matchedSectionFound = false
             val branches = data.optJSONArray("branches")
             if (branches != null) {
@@ -411,7 +746,7 @@ suspend fun fetchCurrentClassForStudent(
             }
 
             if (!matchedSectionFound) {
-                Log.w(TAG, "Returned data did not contain matched section/year - treating as no class")
+                Log.w(TAG, "Returned data did not contain matched section/year")
                 return@withContext null
             }
 
@@ -421,7 +756,7 @@ suspend fun fetchCurrentClassForStudent(
                 id = (data.optString("_id", token)).hashCode(),
                 subject = subjectDisplay,
                 teacher = teacherName,
-                time = token, // token shown in "time" slot; change as needed
+                time = token,
                 date = dateTimeString,
                 attended = false
             )
@@ -435,7 +770,6 @@ suspend fun fetchCurrentClassForStudent(
     }
 }
 
-
 @Composable
 fun StudentHomeScreen(
     navController: NavController? = null,
@@ -445,20 +779,18 @@ fun StudentHomeScreen(
 ) {
     Scaffold(
         topBar = {
-            // Use your header composable (it will be placed below status bar by Scaffold)
             HeaderWithProfile(fullname = "Kalyan", collegeName = "GVPCE", navController = navController)
         },
         bottomBar = {
             FooterNavPrimary(
-                onHome = { /* navController?.navigate(NavRoutes.Home.route) */ },
-                onClasses = { /* navController?.navigate(NavRoutes.Classes.route) */ },
-                onSettings = { /* navController?.navigate(NavRoutes.Settings.route) */ },
+                onHome = { },
+                onClasses = { },
+                onSettings = { },
                 selected = "HOME"
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.surface
     ) { innerPadding ->
-        // IMPORTANT: apply innerPadding so content is not hidden behind bars
         Box(modifier = Modifier
             .fillMaxSize()
             .padding(innerPadding)
@@ -472,6 +804,7 @@ fun StudentHomeScreen(
         }
     }
 }
+
 @Preview(showBackground = true)
 @Composable
 fun StudentHomeScreenPreview() {
