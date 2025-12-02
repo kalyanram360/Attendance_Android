@@ -19,6 +19,7 @@ import com.example.attendance_android.components.TeacherHomeScreen
 import com.example.attendance_android.components.TeacherBLE
 import com.example.attendance_android.ViewModels.TeacherClassViewModel
 import com.example.attendance_android.components.AdvertisingScreen
+import com.example.attendance_android.components.FaceEnrollmentScreen
 import com.example.attendance_android.components.StudentBleScreen
 import com.example.attendance_android.components.ProfileScreen
 
@@ -108,6 +109,10 @@ fun Navigation(
             ProfileScreen(navController)
         }
 
+        composable(NavRoutes.face_enroll.route){
+            FaceEnrollmentScreen(
+                onEnrolled = {navController.navigate("home")} )
+        }
 
 
 

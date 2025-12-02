@@ -161,8 +161,8 @@ fun StudentScreenContent(
                     classItem = current,
                     isFetched = fetchedCurrentClass != null,
                     onMarkAttendance = {
-                        val roll = studentRoll.ifBlank { "323103382034" }
-                        navController?.navigate("student_ble/${current.time}/${roll}")
+//                        val roll = studentRoll.ifBlank { "323103382034" }
+                        navController?.navigate("face_verify/${current.time}")
                     }
                 )
             }

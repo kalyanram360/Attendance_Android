@@ -80,6 +80,39 @@ dependencies {
     implementation("androidx.room:room-ktx:2.5.2")
     implementation ("androidx.compose.material:material-icons-extended")
 
+    //face recognition
+    implementation("androidx.camera:camera-core:1.2.2")
+    implementation("androidx.camera:camera-camera2:1.2.2")
+    implementation("androidx.camera:camera-lifecycle:1.2.2")
+    implementation("androidx.camera:camera-view:1.2.2")
+    implementation("androidx.camera:camera-extensions:1.2.2")
+
+    // ML Kit - on-device Face Detection
+    implementation("com.google.mlkit:face-detection:16.1.5")
+// TensorFlow Lite (runtime) + optional GPU + support lib for image ops
+    implementation("org.tensorflow:tensorflow-lite:2.11.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+// helper utils (TensorImage etc.)
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.11.0")
+// optional, only if you want GPU delegate
+
+    // Jetpack lifecycle / activity / compose helpers (if using compose)
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
+    implementation("androidx.activity:activity-ktx:1.7.2")
+    implementation("androidx.activity:activity-compose:1.7.2")
+// Kotlin Coroutines (use for async camera/ML/TFLite)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
+// Optional: Coil or accompanist if you want to show bitmaps in Compose
+    implementation("io.coil-kt:coil-compose:2.2.2")
+// for images in Compose
+    implementation("com.google.accompanist:accompanist-permissions:0.30.1")
+// permissions helper
+// Optional: logging / debugging helpers
+    implementation("com.jakewharton.timber:timber:5.0.1")
+// (If you use Gson or Moshi for simple JSON, add them)
+    implementation("com.google.code.gson:gson:2.10.1")
+// optional
+
     // Use explicit add(...) to avoid unresolved kapt(...) helper in some Gradle Kotlin DSL environments
     add("kapt", "androidx.room:room-compiler:2.5.2")
 

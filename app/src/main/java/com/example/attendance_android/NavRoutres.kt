@@ -11,4 +11,8 @@ sealed class NavRoutes(val route: String) {
 
 
     object profile : NavRoutes("profile")
+
+    object face_enroll : NavRoutes("face_enroll")
+
+    object FaceVerify : NavRoutes("face_verify")
 }
