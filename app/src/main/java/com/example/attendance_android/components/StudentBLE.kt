@@ -140,8 +140,8 @@ fun StudentBleScreen(
                                         withContext(Dispatchers.IO) {
                                             val db = PresentDatabase.getInstance(context)
                                             val presentEntity = PresentEntity(
-                                                subject = response.studentData?.name ?: "Unknown",
-                                                teacher = response.studentData?.rollNo ?: "Unknown",
+                                                subject = response.studentData?.Subject ?: "Unknown",
+                                                teacher = response.studentData?.Teacher ?: "Unknown",
                                                 createdAt = System.currentTimeMillis()
                                             )
                                             db.presentDao().insert(presentEntity)
@@ -638,7 +638,9 @@ data class StudentData(
     val present: Boolean,
     val branch: String,
     val section: String,
-    val year: Int
+    val year: Int,
+    val Subject: String,
+    val Teacher: String
 )
 
 // ---------- Helper: PATCH request to mark attendance ----------
@@ -685,7 +687,9 @@ suspend fun markAttendance(
                 present = student.getBoolean("present"),
                 branch = student.getString("branch"),
                 section = student.getString("section"),
-                year = student.getInt("year")
+                year = student.getInt("year"),
+                Subject = student.getString("Subject"),
+                Teacher = student.getString("Teacher")
             )
         } else null
 
