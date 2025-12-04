@@ -43,6 +43,9 @@ import kotlinx.coroutines.runBlocking
 import com.example.attendance_android.components.TeacherBLE
 import java.util.concurrent.ThreadLocalRandom.current
 import kotlinx.coroutines.flow.first
+import com.example.attendance_android.NavRoutes.Attendance_View
+import com.example.attendance_android.components.AttendanceViewScreen
+
 class MainActivity : ComponentActivity() {
    override fun onCreate(savedInstanceState: Bundle?) {
        super.onCreate(savedInstanceState)
@@ -191,27 +194,23 @@ class MainActivity : ComponentActivity() {
                                onStartClass = { _, _, _ -> /* optional callback */ }
                            )
                        }
-                       composable("advertising/{year}/{branch}/{section}/{Subject}/{teacherEmail}") { backStackEntry ->
-                           val year = backStackEntry.arguments?.getString("year") ?: ""
-                           val branch = backStackEntry.arguments?.getString("branch") ?: ""
-                           val section = backStackEntry.arguments?.getString("section") ?: ""
+                       composable("advertising/{sectionsJson}/{subject}/{teacherEmail}") { backStackEntry ->
+                           val sectionsJson = backStackEntry.arguments?.getString("sectionsJson") ?: "[]"
+                           val subject = backStackEntry.arguments?.getString("subject") ?: ""
                            val teacherEmail = backStackEntry.arguments?.getString("teacherEmail") ?: ""
-                           val subject = backStackEntry.arguments?.getString("Subject") ?: ""
 
                            AdvertisingScreen(
                                navController = navController,
-                               year = year,
-                               branch = branch,
-                               section = section,
-                               Subject = subject,
+                               sectionsJson = sectionsJson,
+                               subject = subject,
                                teacherEmail = teacherEmail
                            )
                        }
-                       composable("student_ble/{token}/{studentRoll}") {
+                       composable("student_ble/{token}/{studentRoll}") {backStackEntry ->
                            StudentBleScreen(
                                navController = navController,
-                               tokenToMatch = it.arguments?.getString("token") ?: "",
-                               studentRollNo = it.arguments?.getString("studentRoll") ?: ""
+                               tokenToMatch = backStackEntry.arguments?.getString("token") ?: "",
+                               studentRollNo = backStackEntry.arguments?.getString("studentRoll") ?: ""
                            )
                        }
                        composable(NavRoutes.profile.route) {
@@ -240,6 +239,11 @@ class MainActivity : ComponentActivity() {
                                    }
                                }
                            )
+                       }
+
+                       composable(NavRoutes.Attendance_View.route){backStackEntry ->
+                           AttendanceViewScreen(navController = navController)
+
                        }
 
 
