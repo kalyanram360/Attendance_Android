@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.attendance_android.NavRoutes
 import com.example.attendance_android.data.DataStoreManager
 import com.example.attendance_android.data.PresentDatabase
 import com.example.attendance_android.data.PresentEntity
@@ -162,7 +163,7 @@ fun StudentScreenContent(
                     isFetched = fetchedCurrentClass != null,
                     onMarkAttendance = {
 //                        val roll = studentRoll.ifBlank { "323103382034" }
-                        navController?.navigate("face_verify/${current.time}/")
+                        navController?.navigate("${NavRoutes.FaceVerify.route}/${current.time}")
                     }
                 )
             }

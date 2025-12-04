@@ -9,9 +9,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.attendance_android.components.OnboardingScreen
 import kotlinx.coroutines.delay
 import com.example.attendance_android.components.StudentHomeScreen
@@ -20,6 +22,7 @@ import com.example.attendance_android.components.TeacherBLE
 import com.example.attendance_android.ViewModels.TeacherClassViewModel
 import com.example.attendance_android.components.AdvertisingScreen
 import com.example.attendance_android.components.FaceEnrollmentScreen
+import com.example.attendance_android.components.FaceVerifyScreen
 import com.example.attendance_android.components.StudentBleScreen
 import com.example.attendance_android.components.ProfileScreen
 
@@ -113,6 +116,20 @@ fun Navigation(
             FaceEnrollmentScreen(
                 onEnrolled = {navController.navigate("home")} )
         }
+        composable(
+            route = "${NavRoutes.FaceVerify.route}/{token}",
+            arguments = listOf(navArgument("token") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val token = backStackEntry.arguments?.getString("token") ?: ""
+            FaceVerifyScreen(
+                navController = navController,
+                token = token
+                // Add other necessary parameters for FaceVerifyScreen
+            )
+        }
+
+
+
 
 
 

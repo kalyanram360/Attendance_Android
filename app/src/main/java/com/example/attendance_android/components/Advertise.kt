@@ -920,11 +920,39 @@ fun AdvertisingScreen(
                                 Text("Cancel")
                             }
 
+                            // In D:/Attendance_Android/app/src/main/java/com/example/attendance_android/components/Advertise.kt
+// Inside the AdvertisingScreen composable
+
+// ...
+
                             Button(
                                 onClick = {
                                     scope.launch {
+                                        posting = true // Indicate that we are processing
                                         val curToken = token ?: return@launch
 
+                                        // 1. Prepare data for the /attendance endpoint
+                                        val attendanceList = studentsForSection.map { student ->
+                                            Pair(student.rollNo, presentMap[student.rollNo] ?: false)
+                                        }
+
+                                        // 2. Call the new /attendance endpoint
+                                        val (attendanceOk, attendanceErr) = postAttendanceToServer(
+                                            year = year,
+                                            branch = branch,
+                                            section = section,
+                                            subject = Subject,
+                                            attendanceData = attendanceList,
+                                            backendBaseUrl = backendBaseUrl
+                                        )
+
+                                        if (!attendanceOk) {
+                                            postingError = attendanceErr ?: "Failed to post attendance"
+                                            posting = false
+                                            return@launch // Stop if the first new call fails
+                                        }
+
+                                        // 3. Prepare data for the existing /archive endpoint
                                         val classJson = JSONObject()
                                         classJson.put("token", curToken)
                                         val teacherObj = JSONObject()
@@ -947,6 +975,7 @@ fun AdvertisingScreen(
                                                     val stuObj = JSONObject()
                                                     stuObj.put("rollNo", st.rollNo)
                                                     stuObj.put("name", st.name)
+                                                    // Use the final edited values from presentMap
                                                     stuObj.put("present", presentMap[st.rollNo] ?: st.present)
                                                     studs.put(stuObj)
                                                 }
@@ -958,8 +987,13 @@ fun AdvertisingScreen(
                                         }
                                         classJson.put("branches", branchesJson)
 
-                                        val (ok, err) = archiveClassOnServer(classJson)
-                                        if (ok) {
+                                        // 4. Call the existing /archive endpoint
+                                        val (archiveOk, archiveErr) = archiveClassOnServer(classJson)
+
+                                        posting = false // Processing finished
+
+                                        if (archiveOk) {
+                                            // Both calls were successful
                                             postingError = null
                                             advError = null
                                             try {
@@ -977,23 +1011,33 @@ fun AdvertisingScreen(
                                                 Log.e(tag, "Failed to save: ${e.message}")
                                             }
 
+                                            // Navigate home after success
                                             navController?.navigate(NavRoutes.TeacherHome.route) {
                                                 popUpTo(0)
                                             }
                                         } else {
-                                            postingError = err ?: "Failed to archive"
+                                            postingError = archiveErr ?: "Failed to archive class"
                                         }
                                     }
                                 },
+                                enabled = !posting, // Disable button while processing
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(56.dp),
                                 shape = MaterialTheme.shapes.large
                             ) {
-                                Icon(Icons.Outlined.Archive, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Archive")
+                                if (posting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(Icons.Outlined.Archive, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Archive")
+                                }
                             }
+
                         }
                     }
                 }
@@ -1056,6 +1100,7 @@ fun InfoChip(label: String, value: String) {
         )
     }
 }
+
 
 @Composable
 fun AttendanceCard(student: AttendedStudent) {
@@ -1192,6 +1237,82 @@ fun EditableAttendanceCard(
         }
     }
 }
+
+
+// In D:/Attendance_Android/app/src/main/java/com/example/attendance_android/components/Advertise.kt
+
+// ... (existing code)
+
+// Helper function to create and post to the /attendance endpoint
+suspend fun postAttendanceToServer(
+    year: String,
+    branch: String,
+    section: String,
+    subject: String,
+    attendanceData: List<Pair<String, Boolean>>, // List of (rollNo, isPresent)
+    backendBaseUrl: String
+): Pair<Boolean, String?> = withContext(Dispatchers.IO) {
+    try {
+        val url = URL("$backendBaseUrl/api/attendance") // Your new endpoint
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            connectTimeout = 15_000
+            readTimeout = 15_000
+        }
+
+        // --- Build the JSON body according to your backend requirements ---
+        val bodyJson = JSONObject().apply {
+            put("year", romanToInt(year)) // Convert Roman numeral year to Int
+            put("branch", branch)
+            put("section", section)
+            put("subject", subject)
+            put("date", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date()))
+
+            val attendanceArray = org.json.JSONArray()
+            attendanceData.forEach { (rollNo, isPresent) ->
+                val studentAttendance = JSONObject().apply {
+                    put("rollNumber", rollNo)
+                    put("present", isPresent)
+                }
+                attendanceArray.put(studentAttendance)
+            }
+            put("attendance", attendanceArray)
+        }
+
+        // Write the JSON body to the request
+        conn.outputStream.use { os ->
+            OutputStreamWriter(os, "UTF-8").use { writer ->
+                writer.write(bodyJson.toString())
+                writer.flush()
+            }
+        }
+
+        val code = conn.responseCode
+        val responseText = if (code in 200..299) {
+            conn.inputStream.bufferedReader().use { it.readText() }
+        } else {
+            conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+        }
+        conn.disconnect()
+
+        return@withContext if (code in 200..299) {
+            Pair(true, null) // Success
+        } else {
+            Pair(false, "Server $code: $responseText") // Failure
+        }
+
+    } catch (e: Exception) {
+        Log.e("AdvertisingScreen", "postAttendanceToServer error: ${e.message}")
+        return@withContext Pair(false, "Client-side error: ${e.message}")
+    }
+}
+
+// ... (rest of the file, including archiveClassOnServer function)
+// Helper function to convert Roman numeral string to an Integer
+
+
 @Preview(showBackground = true)
 @Composable
 fun AdvertisingScreenPreview() {
