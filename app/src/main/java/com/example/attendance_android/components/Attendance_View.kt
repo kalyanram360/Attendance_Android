@@ -217,8 +217,8 @@ fun AttendanceViewScreen(
                 pdfDocument.finishPage(page)
 
                 val file = File(
-                    context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS),
-                    "attendance_${System.currentTimeMillis()}.pdf"
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "Attendance_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.pdf"
                 )
                 pdfDocument.writeTo(FileOutputStream(file))
                 pdfDocument.close()
@@ -256,8 +256,8 @@ fun AttendanceViewScreen(
                 }
 
                 val file = File(
-                    context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS),
-                    "attendance_${System.currentTimeMillis()}.csv"
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "Attendance_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.csv"
                 )
                 file.writeText(csv.toString())
 
@@ -694,17 +694,21 @@ fun AttendanceViewScreen(
                                 )
                             }
 
-                            Row(
-                                modifier = Modifier.horizontalScroll(rememberScrollState())
-                            ) {
-                                // Roll Number Column
-                                Column(modifier = Modifier.width(120.dp)) {
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                // Roll Number Column - Fixed
+                                Column(
+                                    modifier = Modifier
+                                        .width(150.dp)
+                                        .background(MaterialTheme.colorScheme.surface)
+                                ) {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .height(48.dp)
                                             .background(MaterialTheme.colorScheme.surfaceVariant)
                                             .border(0.5.dp, MaterialTheme.colorScheme.outline)
-                                            .padding(12.dp)
+                                            .padding(8.dp),
+                                        contentAlignment = Alignment.CenterStart
                                     ) {
                                         Text("Roll Number", fontWeight = FontWeight.Bold)
                                     }
@@ -712,55 +716,65 @@ fun AttendanceViewScreen(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .height(48.dp)
                                                 .border(0.5.dp, MaterialTheme.colorScheme.outline)
-                                                .padding(12.dp)
+                                                .padding(8.dp),
+                                            contentAlignment = Alignment.CenterStart
                                         ) {
                                             Text(student.rollNumber, fontWeight = FontWeight.Medium)
                                         }
                                     }
                                 }
 
-                                // Date Columns
-                                dates.forEach { date ->
-                                    Column(modifier = Modifier.width(80.dp)) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                                .border(0.5.dp, MaterialTheme.colorScheme.outline)
-                                                .padding(8.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                formatDate(date),
-                                                fontWeight = FontWeight.Bold,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
-                                        students.forEach { student ->
+                                // Dates Columns - Scrollable
+                                Row(
+                                    modifier = Modifier
+                                        .padding(start = 150.dp)
+                                        .horizontalScroll(rememberScrollState())
+                                ) {
+                                    dates.forEach { date ->
+                                        Column(modifier = Modifier.width(80.dp)) {
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
+                                                    .height(48.dp)
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                                     .border(0.5.dp, MaterialTheme.colorScheme.outline)
                                                     .padding(8.dp),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                val present = student.attendanceMap[date]
-                                                when (present) {
-                                                    true -> Text(
-                                                        "✓",
-                                                        color = Color(0xFF4CAF50),
-                                                        style = MaterialTheme.typography.titleLarge,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                    false -> Text(
-                                                        "✗",
-                                                        color = Color(0xFFF44336),
-                                                        style = MaterialTheme.typography.titleLarge,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                    null -> Text("-", color = Color.Gray)
+                                                Text(
+                                                    formatDate(date),
+                                                    fontWeight = FontWeight.Bold,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                            students.forEach { student ->
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(48.dp)
+                                                        .border(0.5.dp, MaterialTheme.colorScheme.outline)
+                                                        .padding(8.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    val present = student.attendanceMap[date]
+                                                    when (present) {
+                                                        true -> Text(
+                                                            "✓",
+                                                            color = Color(0xFF4CAF50),
+                                                            style = MaterialTheme.typography.titleLarge,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                        false -> Text(
+                                                            "✗",
+                                                            color = Color(0xFFF44336),
+                                                            style = MaterialTheme.typography.titleLarge,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                        null -> Text("-", color = Color.Gray)
+                                                    }
                                                 }
                                             }
                                         }
