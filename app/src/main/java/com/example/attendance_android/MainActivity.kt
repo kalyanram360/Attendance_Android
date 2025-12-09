@@ -45,11 +45,21 @@ import java.util.concurrent.ThreadLocalRandom.current
 import kotlinx.coroutines.flow.first
 import com.example.attendance_android.NavRoutes.Attendance_View
 import com.example.attendance_android.components.AttendanceViewScreen
+import android.Manifest
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.ui.platform.LocalContext
 
 class MainActivity : ComponentActivity() {
    override fun onCreate(savedInstanceState: Bundle?) {
        super.onCreate(savedInstanceState)
        enableEdgeToEdge()
+       
+       // Request permissions when app starts
+       requestPermissions()
+       
        setContent {
            Attendance_AndroidTheme {
                Surface(modifier = Modifier.fillMaxSize()) {
@@ -253,6 +263,33 @@ class MainActivity : ComponentActivity() {
            } // Theme
        } // setContent
 
+   }
+
+   private fun requestPermissions() {
+       val permissions = mutableListOf(
+           Manifest.permission.CAMERA,
+           Manifest.permission.ACCESS_FINE_LOCATION,
+           Manifest.permission.ACCESS_COARSE_LOCATION
+       )
+       
+       // Add Bluetooth permissions for Android 12+
+       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+           permissions.add(Manifest.permission.BLUETOOTH_SCAN)
+           permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+       }
+       
+       val permissionLauncher = registerForActivityResult(
+           ActivityResultContracts.RequestMultiplePermissions()
+       ) { permissions ->
+           // Handle permission results
+           val deniedPermissions = permissions.filter { !it.value }.map { it.key }
+           if (deniedPermissions.isNotEmpty()) {
+               // Log denied permissions
+               android.util.Log.w("Permissions", "Denied: $deniedPermissions")
+           }
+       }
+       
+       permissionLauncher.launch(permissions.toTypedArray())
    }
 }
 
