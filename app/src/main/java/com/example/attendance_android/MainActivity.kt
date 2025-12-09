@@ -51,6 +51,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import kotlinx.coroutines.delay
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.size
 
 class MainActivity : ComponentActivity() {
    override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,12 +90,27 @@ class MainActivity : ComponentActivity() {
                        startDestination = NavRoutes.Splash.route
                    ) {
                        composable(NavRoutes.Splash.route) {
+                           // Display splash screen with logo while loading
+                           Box(
+                               modifier = Modifier
+                                   .fillMaxSize()
+                                   .background(color = Color(0xFF002444)),
+                               contentAlignment = Alignment.Center
+                           ) {
+                               Image(
+                                   painter = painterResource(id = R.drawable.untitled_design),
+                                   contentDescription = "App Logo",
+                                   modifier = Modifier.size(120.dp),
+                                   contentScale = ContentScale.Fit
+                               )
+                           }
+
                            // The splash decides where to go after a short delay or immediately,
                            // based on DataStore values. We need to call suspend functions (loadEmbedding),
                            // so use LaunchedEffect.
                            LaunchedEffect(key1 = role, key2 = isOnboardingDone) {
-                               // small optional splash delay for UX (remove if you don't want a delay)
-                               // delay(700)
+                               // small optional splash delay for UX
+                               delay(1500)
 
                                when {
                                    !isOnboardingDone -> {
@@ -133,16 +155,6 @@ class MainActivity : ComponentActivity() {
                                        }
                                    }
                                }
-                           }
-
-                           // Simple splash UI while decision happens
-                           Box(
-                               modifier = Modifier
-                                   .fillMaxSize()
-                                   .padding(16.dp),
-                               contentAlignment = Alignment.Center
-                           ) {
-                               Text(text = "Loading...")
                            }
                        }
 

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.activity.compose.BackHandler
 import com.example.attendance_android.NavRoutes
 import com.example.attendance_android.data.DataStoreManager
 import com.example.attendance_android.data.PresentDatabase
@@ -786,6 +787,11 @@ fun StudentHomeScreen(
     val context = LocalContext.current
     val dataStore = remember { DataStoreManager(context) }
     val name by dataStore.name.collectAsState(initial = "")
+    
+    // Prevent back navigation from Home screen
+    BackHandler(enabled = true) {
+        // Do nothing - prevent going back to Onboarding
+    }
     
     Scaffold(
         topBar = {
