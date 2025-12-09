@@ -47,7 +47,11 @@ fun HeaderWithProfile(
     collegeName: String = "GVPCE"
 ) {
     val initial = remember(fullname) {
-        fullname.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "P"
+        if (fullname.isBlank()) {
+            collegeName.firstOrNull()?.uppercaseChar()?.toString() ?: "G"
+        } else {
+            fullname.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "P"
+        }
     }
 
     Surface(
@@ -139,12 +143,12 @@ fun FooterNavPrimary(
                 onClick = onClasses
             )
 
-            FooterItem(
-                label = "Settings",
-                selected = selected == "SETTINGS",
-                icon = Icons.Default.Settings,
-                onClick = onSettings
-            )
+            // FooterItem(
+            //     label = "Settings",
+            //     selected = selected == "SETTINGS",
+            //     icon = Icons.Default.Settings,
+            //     onClick = onSettings
+            // )
         }
     }
 }

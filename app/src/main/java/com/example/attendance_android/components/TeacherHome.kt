@@ -33,6 +33,8 @@ import kotlinx.coroutines.flow.collect
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.runtime.collectAsState
+import com.example.attendance_android.data.DataStoreManager
 
 @Composable
 fun TeacherHomeScreen(
@@ -41,12 +43,16 @@ fun TeacherHomeScreen(
     collegeName: String = "GVPCE",
     onStartClassRoute: String = "bleAdvertise"
 ) {
+    val context = LocalContext.current
+    val dataStore = remember { DataStoreManager(context) }
+    val name: androidx.compose.runtime.State<String> = dataStore.name.collectAsState(initial = "")
+    
     Scaffold(
         topBar = {
             HeaderWithProfile(
-                fullname = fullname,
+                fullname = name.value,
                 collegeName = collegeName,
-                navController = navController
+                navController = navController,
             )
         },
         bottomBar = {

@@ -55,6 +55,9 @@ data class ClassItem(
 
 private const val TAG = "StudentHome"
 
+//name from datastore 
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudentScreenContent(
@@ -771,6 +774,8 @@ suspend fun fetchCurrentClassForStudent(
     }
 }
 
+
+
 @Composable
 fun StudentHomeScreen(
     navController: NavController? = null,
@@ -778,9 +783,13 @@ fun StudentHomeScreen(
     previousClasses: List<ClassItem> = emptyList(),
     onMarkAttendance: (ClassItem) -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val dataStore = remember { DataStoreManager(context) }
+    val name by dataStore.name.collectAsState(initial = "")
+    
     Scaffold(
         topBar = {
-            HeaderWithProfile(fullname = "Kalyan", collegeName = "GVPCE", navController = navController)
+            HeaderWithProfile(fullname = name, collegeName = "GVPCE", navController = navController)
         },
         bottomBar = {
             FooterNavPrimary(
