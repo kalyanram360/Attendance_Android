@@ -66,7 +66,7 @@ fun TeacherHomeScreen(
                 onHome = { navController.navigate(NavRoutes.TeacherHome.route) { launchSingleTop = true } },
                 onClasses = { navController.navigate(NavRoutes.Attendance_View.route){launchSingleTop= true} },
                 onSettings = { /* optional nav */ },
-                selected = "CLASSES"
+                selected = "HOME"
             )
         },
         containerColor = MaterialTheme.colorScheme.surface

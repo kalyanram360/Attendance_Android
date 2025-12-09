@@ -54,7 +54,7 @@ fun ProfileScreen(
                 onHome = { navController.navigateUp() }, // example behavior
                 onClasses = { /* navigate to classes if you want */ },
                 onSettings = { /* navigate to settings */ },
-                selected = "PROFILE"
+                selected = "HOME"
             )
         },
         containerColor = MaterialTheme.colorScheme.background
