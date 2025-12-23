@@ -1,3 +1,5 @@
+
+
 package com.example.attendance_android.components
 
 import androidx.compose.animation.core.animateDpAsState
@@ -12,6 +14,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +33,7 @@ import com.example.attendance_android.ViewModels.OnboardingViewModel
 import com.example.attendance_android.ViewModels.UserRole
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material3.ExperimentalMaterial3Api
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -51,11 +56,10 @@ import androidx.navigation.NavController
 import android.util.Log
 import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
     navController: NavController,
-//    viewModel: OnboardingViewModel = viewModel(),
     onOnboardingComplete: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -68,9 +72,9 @@ fun OnboardingScreen(
     val pagerState = rememberPagerState { pages }
     val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
+
     if (uiState.isOnboardingComplete) {
         CompletionPage {
-            // call caller callback so host can navigate away if needed
             onOnboardingComplete()
         }
         return
@@ -80,32 +84,49 @@ fun OnboardingScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp)
+            .statusBarsPadding() // Avoid status bar overlap
+            .navigationBarsPadding() // Avoid navigation bar overlap
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(150.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            // top logo placeholder (keeps same position for all pages)
-            Box(
-                modifier = Modifier
-                    .size(150.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
+            // App Logo/Brand
+            Surface(
+                modifier = Modifier.size(100.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shadowElevation = 8.dp
             ) {
-                Text(
-                    text = "Logo",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.School,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // pager
+            Text(
+                text = "Attendance",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Pager Content
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
@@ -134,27 +155,26 @@ fun OnboardingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // indicators
+            // Page Indicators
             HorizontalPagerIndicator(
                 pagerState = pagerState,
                 pageCount = pages,
-                modifier = Modifier.padding(8.dp),
+                modifier = Modifier.padding(vertical = 8.dp),
                 activeColor = MaterialTheme.colorScheme.primary,
                 inactiveColor = MaterialTheme.colorScheme.surfaceVariant,
-                indicatorWidth = 12.dp,
-                indicatorHeight = 12.dp,
+                indicatorWidth = 10.dp,
+                indicatorHeight = 10.dp,
                 spacing = 8.dp
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Next / Get Started button
+            // Action Button
             val isPageValid by remember(pagerState.currentPage, uiState) {
                 derivedStateOf { viewModel.isPageValid(pagerState.currentPage) }
             }
-            val context = LocalContext.current
 
             Button(
                 onClick = {
@@ -163,7 +183,6 @@ fun OnboardingScreen(
                             pagerState.animateScrollToPage(pagerState.currentPage + 1)
                         }
                     } else {
-                        // Last page → call correct API based on role
                         scope.launch {
                             val success = try {
                                 if (uiState.selectedRole == UserRole.STUDENT) {
@@ -200,36 +219,43 @@ fun OnboardingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 4.dp,
+                    pressedElevation = 8.dp
+                )
             ) {
                 Text(
                     text = if (pagerState.currentPage < pages - 1) "Next" else "Get Started",
-                    fontSize = 18.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
-
-
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // Optional Skip at top-end
-        if (pagerState.currentPage < pages - 1) {
-            TextButton(
-                onClick = {
-                    viewModel.completeOnboarding()
-                    onOnboardingComplete()
-                },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-            ) {
-                Text(text = "Skip", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
+        // Skip Button
+//        if (pagerState.currentPage < pages - 1) {
+//            TextButton(
+//                onClick = {
+//                    viewModel.completeOnboarding()
+//                    onOnboardingComplete()
+//                },
+//                modifier = Modifier
+//                    .align(Alignment.TopEnd)
+//                    .padding(16.dp)
+//            ) {
+//                Text(
+//                    text = "Skip",
+//                    color = MaterialTheme.colorScheme.primary,
+//                    fontWeight = FontWeight.Medium
+//                )
+//            }
+//        }
     }
 }
+// Individual Page Composables
 
 @Composable
 private fun ActivationCodePage(
@@ -237,45 +263,71 @@ private fun ActivationCodePage(
     onCodeChanged: (String) -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Top
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text(
-            text = "Activation Code",
-            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+            text = "Almost There!",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(12.dp))
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         Text(
-            text = "Enter activation code",
+            text = "Enter your activation code to complete setup",
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
             value = code,
             onValueChange = onCodeChanged,
-            label = { Text("Activation code") },
+            label = { Text("Activation Code") },
+            placeholder = { Text("XXXX-XXXX-XXXX") },
             singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(12.dp)
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+            )
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // explanatory / optional space
-        Text(
-            text = "You can get the activation code from your institute.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.School,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Get your activation code from your institute administrator",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
     }
 }
 
@@ -289,49 +341,71 @@ private fun CredentialsPage(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 8.dp),
-        horizontalAlignment = Alignment.Start
+            .padding(horizontal = 16.dp),
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.Top
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Enter Credentials",
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
-        )
         Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "Your Information",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "We'll use this to verify your account",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
             value = name,
             onValueChange = onNameChanged,
-            label = { Text("Name") },
-            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+            label = { Text("Full Name") },
+            placeholder = { Text("John Doe") },
+            leadingIcon = {
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
             singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(12.dp)
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+            )
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = email,
             onValueChange = onEmailChanged,
-            label = { Text("College-mail-id") },
+            label = { Text("College Email") },
+            placeholder = { Text("you@college.edu") },
+            leadingIcon = {
+                Icon(
+                    Icons.Default.Email,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // small note
-        Text(
-            text = "We'll use this email to verify your account.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+            )
         )
     }
 }
@@ -344,85 +418,147 @@ private fun RoleSelectionPage(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Top
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text(
-            text = "Select your Role",
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            text = "Choose Your Role",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Select how you'll be using the app",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             RoleCard(
                 role = UserRole.STUDENT,
                 selected = selectedRole == UserRole.STUDENT,
-                onSelect = { onRoleSelected(UserRole.STUDENT) }
+                onSelect = { onRoleSelected(UserRole.STUDENT) },
+                modifier = Modifier.weight(1f)
             )
 
             RoleCard(
                 role = UserRole.TEACHER,
                 selected = selectedRole == UserRole.TEACHER,
-                onSelect = { onRoleSelected(UserRole.TEACHER) }
+                onSelect = { onRoleSelected(UserRole.TEACHER) },
+                modifier = Modifier.weight(1f)
             )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(
-            text = "Choose Student if you will scan tokens. Choose Teacher to broadcast tokens.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-    }
-}
-
-@Composable
-private fun RoleCard(role: UserRole, selected: Boolean, onSelect: () -> Unit) {
-    val background = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant
-    val borderRadius = if (selected) 18.dp else 12.dp
-    Card(
-        modifier = Modifier
-            .size(width = 140.dp, height = 120.dp)
-            .clickable { onSelect() },
-        shape = RoundedCornerShape(borderRadius),
-        colors = CardDefaults.cardColors(containerColor = background)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (role == UserRole.STUDENT) "S" else "T",
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = if (role == UserRole.STUDENT) "Student" else "Teacher",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
+                text = "Students scan attendance tokens • Teachers broadcast tokens",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(16.dp)
             )
         }
     }
 }
 
+@Composable
+private fun RoleCard(
+    role: UserRole,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val backgroundColor = if (selected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    val borderColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outline
+    }
+
+    Surface(
+        onClick = onSelect,
+        modifier = modifier.height(160.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = backgroundColor,
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (selected) 2.dp else 1.dp,
+            color = borderColor
+        ),
+        shadowElevation = if (selected) 8.dp else 2.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                modifier = Modifier.size(56.dp),
+                shape = CircleShape,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.primaryContainer
+                }
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Text(
+                        text = if (role == UserRole.STUDENT) "S" else "T",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = if (role == UserRole.STUDENT) "Student" else "Teacher",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InstituteSelectionPage(
     selectedInstitute: String,
@@ -431,81 +567,106 @@ private fun InstituteSelectionPage(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Top
     ) {
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text(
-            text = "Select Institute",
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+            text = "Select Your Institute",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Choose your college from the list below",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
 
         var expanded by remember { mutableStateOf(false) }
-        val institutes = listOf("Gayatri Vidya Parishad", "Institute B", "Institute C", "MainCollege")
+        val institutes = listOf(
+            "Gayatri Vidya Parishad",
+            "Institute B",
+            "Institute C",
+            "MainCollege"
+        )
 
-        Box(modifier = Modifier.fillMaxWidth()) {
-            OutlinedCard(
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it }
+        ) {
+            OutlinedTextField(
+                value = selectedInstitute,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Institute") },
+                placeholder = { Text("Select your institute") },
+                trailingIcon = {
+                    Icon(
+                        Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .clickable { expanded = !expanded },
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = selectedInstitute.ifEmpty { "Select Institute" },
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = null
-                    )
-                }
-            }
+                    .menuAnchor(),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                )
+            )
 
-            DropdownMenu(
+            ExposedDropdownMenu(
                 expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.fillMaxWidth()
+                onDismissRequest = { expanded = false }
             ) {
-                institutes.forEach { inst ->
-                    DropdownMenuItem(text = { Text(inst) }, onClick = {
-                        onInstituteSelected(inst)
-                        expanded = false
-                    })
+                institutes.forEach { institute ->
+                    DropdownMenuItem(
+                        text = { Text(institute) },
+                        onClick = {
+                            onInstituteSelected(institute)
+                            expanded = false
+                        }
+                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(36.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        Text(
-            text = "Pick your college/institute from the list. You can change it later.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+        ) {
+            Text(
+                text = "💡 You can change your institute later in settings",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
     }
 }
 
-/*
- Custom pager indicator (kept from your original code; slightly refactored)
-*/
 @Composable
 fun HorizontalPagerIndicator(
     pagerState: PagerState,
     pageCount: Int,
     modifier: Modifier = Modifier,
     activeColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
-    inactiveColor: androidx.compose.ui.graphics.Color = activeColor.copy(alpha = 0.5f),
+    inactiveColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceVariant,
     indicatorWidth: Dp = 8.dp,
     indicatorHeight: Dp = indicatorWidth,
     spacing: Dp = indicatorWidth,
@@ -518,13 +679,12 @@ fun HorizontalPagerIndicator(
         repeat(pageCount) { iteration ->
             val color = if (pagerState.currentPage == iteration) activeColor else inactiveColor
             val width by animateDpAsState(
-                targetValue = if (pagerState.currentPage == iteration) indicatorWidth * 1.5f else indicatorWidth,
+                targetValue = if (pagerState.currentPage == iteration) indicatorWidth * 2f else indicatorWidth,
                 label = "indicator width"
             )
             Box(
                 modifier = Modifier
-                    .padding(2.dp)
-                    .clip(CircleShape)
+                    .clip(RoundedCornerShape(indicatorHeight / 2))
                     .background(color)
                     .height(indicatorHeight)
                     .width(width)
@@ -533,8 +693,80 @@ fun HorizontalPagerIndicator(
     }
 }
 
-// --- add this helper function near the bottom of the file (or in a suitable utils/VM) ---
+@Composable
+fun CompletionPage(onClose: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                modifier = Modifier.size(100.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shadowElevation = 8.dp
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Text(
+                        text = "✓",
+                        style = MaterialTheme.typography.displayLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
 
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "All Set!",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Your account has been verified successfully",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Button(
+                onClick = onClose,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 4.dp
+                )
+            ) {
+                Text(
+                    text = "Continue",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+// API helper functions remain the same
 suspend fun checkTeacher(collegeEmail: String): JSONObject? = withContext(Dispatchers.IO) {
     val base = "https://attendance-app-backend-zr4c.onrender.com"
     val eEmail = try { URLEncoder.encode(collegeEmail.trim().lowercase(), "utf-8") } catch (e: Exception) { collegeEmail.trim().lowercase() }
@@ -593,12 +825,6 @@ suspend fun checkStudent(collegeEmail: String): JSONObject? = withContext(Dispat
     }
 }
 
-// ---------- Save-to-DataStore helpers ----------
-
-/**
- * Teacher: save ROLE, NAME, EMAIL. Do NOT set COLLEGE or RollNumber.
- * Returns true if teacher found and saved; false otherwise.
- */
 suspend fun checkTeacherAndSave(
     email: String,
     dataStore: DataStoreManager
@@ -613,13 +839,11 @@ suspend fun checkTeacherAndSave(
     Log.d("checkTeacherAndSave", "Backend response: $teacherJson")
     Log.d("checkTeacherAndSave", "Extracted name: '$name'")
 
-    // save values
     try {
         dataStore.setName(name)
         dataStore.setEmail(collegeEmail)
         dataStore.setRole(role)
         Log.d("checkTeacherAndSave", "Successfully saved to DataStore - Name: '$name'")
-        // teacher: do NOT set COLLEGE or RollNumber (per your requirement)
         dataStore.setStudent(false)
         dataStore.setLoggedIn(true)
     } catch (e: Exception) {
@@ -631,10 +855,6 @@ suspend fun checkTeacherAndSave(
     return@withContext true
 }
 
-/**
- * Student: save ROLE, NAME, EMAIL, RollNumber. Do NOT set COLLEGE.
- * Returns true if student found and saved; false otherwise.
- */
 suspend fun checkStudentAndSave(
     email: String,
     dataStore: DataStoreManager
@@ -650,15 +870,11 @@ suspend fun checkStudentAndSave(
     val section = studentJson.optString("section", "")
     val year = studentJson.optString("year", "")
 
-
-    // save values
     try {
         dataStore.setName(name)
         dataStore.setEmail(collegeEmail)
         dataStore.setRole(role)
-        // Save roll number (your DataStore method is named `RollNumber`)
         dataStore.setrollNumber(rollNumber)
-        // do NOT set COLLEGE (per your requirement)
         dataStore.setStudent(true)
         dataStore.setLoggedIn(true)
         dataStore.setBranch(branch)
@@ -678,7 +894,6 @@ suspend fun checkCollegeNetwork(
     activationCode: String
 ): Boolean = withContext(Dispatchers.IO) {
     val base = "https://attendance-app-backend-zr4c.onrender.com"
-    // encode path segments
     val eEmail = URLEncoder.encode(collegeEmail, "utf-8")
     val eName = URLEncoder.encode(collegeName, "utf-8")
     val eCode = URLEncoder.encode(activationCode, "utf-8")
@@ -697,7 +912,6 @@ suspend fun checkCollegeNetwork(
         val responseText = stream.bufferedReader().use { it.readText() }
         val responseJson = JSONObject(responseText)
 
-        // Primary: check "exists" boolean. Fallback: "success"
         if (responseJson.has("exists")) {
             return@withContext responseJson.optBoolean("exists", false)
         }
@@ -710,28 +924,6 @@ suspend fun checkCollegeNetwork(
         return@withContext false
     } finally {
         conn.disconnect()
-    }
-}
-
-
-
-// --- Minimal CompletionPage UI (add to file if you want to display a simple success screen) ---
-@Composable
-fun CompletionPage(onClose: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("Setup complete", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(12.dp))
-        Text("Your college was validated successfully.", style = MaterialTheme.typography.bodyLarge)
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = onClose) {
-            Text("Continue")
-        }
     }
 }
 
