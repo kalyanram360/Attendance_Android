@@ -293,7 +293,7 @@ private fun ActivationCodePage(
             value = code,
             onValueChange = onCodeChanged,
             label = { Text("Activation Code") },
-            placeholder = { Text("XXXX-XXXX-XXXX") },
+            placeholder = { Text("XXXXXX") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -593,10 +593,7 @@ private fun InstituteSelectionPage(
 
         var expanded by remember { mutableStateOf(false) }
         val institutes = listOf(
-            "Gayatri Vidya Parishad",
-            "Institute B",
-            "Institute C",
-            "MainCollege"
+            "Gayatri Vidya Parishad College of Engineering (GVPCE)",
         )
 
         ExposedDropdownMenuBox(
