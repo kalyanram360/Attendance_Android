@@ -517,12 +517,13 @@ fun TeacherBLE(
     availableBranches: List<String> = listOf("CSE", "ECE", "ME", "CE"),
     availableSections: List<String> = listOf("A", "B", "C"),
     availableSubjects: List<String> = listOf("DS", "OS", "DBMS"),
-    fullname: String = "Professor",
+    fullname: String = "T",
     collegeName: String = "GVPCE",
     onStartClass: (year: String, branch: String, section: String) -> Unit = { _, _, _ -> },
     navController: NavController,
     viewModel: TeacherClassViewModel = viewModel()
 ) {
+    val fullname by dataStore.name.collectAsState(initial = "")
     val context = LocalContext.current
     val dataStore = remember { DataStoreManager(context) }
     val teacherEmail by dataStore.email.collectAsState(initial = "")
